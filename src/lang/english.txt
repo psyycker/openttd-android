@@ -450,6 +450,7 @@ STR_SETTINGS_MENU_GAME_OPTIONS                                  :Game options
 STR_SETTINGS_MENU_AI_SETTINGS                                   :AI settings
 STR_SETTINGS_MENU_GAMESCRIPT_SETTINGS                           :Game script settings
 STR_SETTINGS_MENU_NEWGRF_SETTINGS                               :NewGRF settings
+STR_SETTINGS_MENU_ANDROID_APP_SETTINGS                          :App settings (storage location)
 STR_SETTINGS_MENU_SANDBOX_OPTIONS                               :Sandbox options
 STR_SETTINGS_MENU_TRANSPARENCY_OPTIONS                          :Transparency options
 STR_SETTINGS_MENU_TOWN_NAMES_DISPLAYED                          :Town names displayed
@@ -2234,6 +2235,7 @@ STR_INTRO_SCENARIO_EDITOR                                       :{BLACK}Scenario
 STR_INTRO_MULTIPLAYER                                           :{BLACK}Multiplayer
 
 STR_INTRO_GAME_OPTIONS                                          :{BLACK}Game Options
+STR_INTRO_ANDROID_APP_SETTINGS                                  :{BLACK}App Settings
 STR_INTRO_HIGHSCORE                                             :{BLACK}Highscore Table
 STR_INTRO_HELP                                                  :{BLACK}Help & Manuals
 STR_INTRO_ONLINE_CONTENT                                        :{BLACK}Online Content
@@ -2252,6 +2254,7 @@ STR_INTRO_TOOLTIP_SUB_TROPICAL_LANDSCAPE                        :{BLACK}Select '
 STR_INTRO_TOOLTIP_TOYLAND_LANDSCAPE                             :{BLACK}Select 'toyland' landscape style
 
 STR_INTRO_TOOLTIP_GAME_OPTIONS                                  :{BLACK}Open game options
+STR_INTRO_TOOLTIP_ANDROID_APP_SETTINGS                          :{BLACK}Open the settings of the Android app, like where savegames and content are stored
 STR_INTRO_TOOLTIP_HIGHSCORE                                     :{BLACK}Open highscore table
 STR_INTRO_TOOLTIP_HELP                                          :{BLACK}Get access to documentation and online resources
 STR_INTRO_TOOLTIP_ONLINE_CONTENT                                :{BLACK}Check for new and updated content to download
