@@ -58,18 +58,22 @@ static void RedirectStdioToLogcat()
  * - The working directory is the read-only game data extracted from the APK
  *   by the Java side (baseset, lang, ai, game, ...).
  * - The personal directory lives in the app-specific external storage, so
- *   users can copy savegames, scenarios and NewGRFs in and out via USB.
+ *   users can copy savegames, scenarios and NewGRFs in and out via USB, or
+ *   in a folder of the user's choice (see StorageLocation.java).
  */
 static void SetupDirectories()
 {
 	const char *internal = SDL_AndroidGetInternalStoragePath();
-	const char *external = SDL_AndroidGetExternalStoragePath();
-	if (external == nullptr) external = internal;
+	/* A folder chosen by the user; set up by StorageLocation.java. */
+	const char *home = getenv("OPENTTD_HOME");
+	if (home == nullptr) home = SDL_AndroidGetExternalStoragePath();
+	if (home == nullptr) home = internal;
 
-	if (external != nullptr) {
-		setenv("HOME", external, 1);
-		setenv("XDG_DATA_HOME", external, 1);
-		setenv("XDG_CONFIG_HOME", external, 1);
+	if (home != nullptr) {
+		std::string home_dir(home); // setenv may invalidate the result of getenv
+		setenv("HOME", home_dir.c_str(), 1);
+		setenv("XDG_DATA_HOME", home_dir.c_str(), 1);
+		setenv("XDG_CONFIG_HOME", home_dir.c_str(), 1);
 	}
 
 	if (internal != nullptr) {
