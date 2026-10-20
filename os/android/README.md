@@ -67,11 +67,20 @@ are signed with the debug key. The version code is the number of commits.
 
 ### Releases
 
-`.github/workflows/deploy.yml` builds the APK on GitHub Actions. Pushing a tag
-starting with `v` publishes it as a GitHub release:
+There are two branches:
+- `stable`: the Android port on top of the latest OpenTTD release (e.g. 15.3).
+  Releases are made from here; they identify as that OpenTTD release, so they
+  can join its multiplayer servers.
+- `main`: the Android port on top of OpenTTD's master (the development
+  version). It is built every night as the "nightly" pre-release, which
+  installs as a separate "OpenTTD Nightly" app (set `openttd.nightly=true`
+  for such a build locally).
+
+`.github/workflows/deploy.yml` builds the APKs on GitHub Actions. Pushing a tag
+starting with `v` on the `stable` branch publishes it as a GitHub release:
 ```
-git tag v1.0.0
-git push origin v1.0.0
+git tag v15.3.0
+git push origin v15.3.0
 ```
 The release key is taken from the repository secrets `ANDROID_KEYSTORE_BASE64`
 (the keystore, base64 encoded), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`
