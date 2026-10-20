@@ -9,6 +9,13 @@ function(set_directory_options)
         set(DEFAULT_PERSONAL_DIR "Documents/OpenTTD")
         set(DEFAULT_SHARED_DIR "/Library/Application Support/OpenTTD")
         set(DEFAULT_GLOBAL_DIR "(not set)")
+    elseif(ANDROID)
+        # The Android activity points XDG_DATA_HOME / XDG_CONFIG_HOME to the
+        # app-specific external storage, and extracts the data files to the
+        # working directory; there is no system-wide data directory.
+        set(DEFAULT_PERSONAL_DIR ".${BINARY_NAME}")
+        set(DEFAULT_SHARED_DIR "(not set)")
+        set(DEFAULT_GLOBAL_DIR "(not set)")
     elseif(WIN32)
         set(DEFAULT_PERSONAL_DIR "OpenTTD")
         set(DEFAULT_SHARED_DIR "(not set)")
@@ -46,7 +53,7 @@ endfunction()
 function(set_options)
     option(OPTION_PACKAGE_DEPENDENCIES "Copy dependencies into lib/ for easy packaging (Linux only)" OFF)
 
-    if(UNIX AND NOT APPLE AND NOT OPTION_PACKAGE_DEPENDENCIES)
+    if(UNIX AND NOT APPLE AND NOT ANDROID AND NOT OPTION_PACKAGE_DEPENDENCIES)
         set(DEFAULT_OPTION_INSTALL_FHS ON)
     else()
         set(DEFAULT_OPTION_INSTALL_FHS OFF)

@@ -242,9 +242,16 @@ include_directories(${CMAKE_SOURCE_DIR}/src/3rdparty/squirrel/include)
 include(MSVCFilters)
 
 add_library(openttd_lib OBJECT ${GENERATED_SOURCE_FILES})
-add_executable(openttd WIN32)
+if(ANDROID)
+    # SDLActivity loads the game as a shared library called "main".
+    add_library(openttd SHARED)
+    set_target_properties(openttd PROPERTIES OUTPUT_NAME "main")
+    target_link_libraries(openttd log android)
+else()
+    add_executable(openttd WIN32)
+    set_target_properties(openttd PROPERTIES OUTPUT_NAME "${BINARY_NAME}")
+endif()
 add_executable(openttd_test)
-set_target_properties(openttd PROPERTIES OUTPUT_NAME "${BINARY_NAME}")
 # All other files are added via target_sources()
 
 if(MSVC)
@@ -293,7 +300,10 @@ if(ANDROID)
 endif()
 
 include(Catch)
-catch_discover_tests(openttd_test)
+if(NOT ANDROID)
+    # Tests cannot be run on the build host when cross-compiling for Android.
+    catch_discover_tests(openttd_test)
+endif()
 
 if(HAIKU)
     target_link_libraries(openttd_lib "be" "network" "midi")
@@ -471,3 +481,12 @@ if(APPLE OR WIN32)
 endif()
 
 include(InstallAndPackage)
+
+if(ANDROID AND ANDROID_ASSETS_DIR)
+    # Gradle packages the game data as APK assets; the app extracts them on first start.
+    add_custom_command(TARGET openttd POST_BUILD
+        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --component language_files --prefix ${ANDROID_ASSETS_DIR}/openttd
+        COMMAND ${CMAKE_COMMAND} --install ${CMAKE_BINARY_DIR} --component docs --prefix ${ANDROID_ASSETS_DIR}/openttd
+        COMMENT "Copying game data to Android assets"
+    )
+endif()

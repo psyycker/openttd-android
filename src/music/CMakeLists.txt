@@ -28,7 +28,7 @@ if(NOT OPTION_DEDICATED)
     add_files(
         extmidi.cpp
         extmidi.h
-        CONDITION UNIX
+        CONDITION UNIX AND NOT ANDROID
     )
 
     add_files(
