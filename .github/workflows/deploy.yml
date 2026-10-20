@@ -1,0 +1,133 @@
+name: Deploy
+
+# Builds the Android APK; pushing a tag (e.g. v1.0.0) publishes it as a GitHub release.
+
+on:
+  push:
+    tags:
+    - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NDK_VERSION: 29.0.14206865
+  # vcpkg version the dependencies are built with; the baseline in vcpkg.json must be part of its history.
+  VCPKG_COMMIT: 65514b43a035548911e1789071785a9827470cdc
+
+jobs:
+  android:
+    name: Android APK
+    runs-on: ubuntu-24.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        # The Android version code is the number of commits.
+        fetch-depth: 0
+
+    - name: Use a development version string in the game
+      if: github.ref_type == 'tag'
+      run: |
+        # OpenTTD takes its version from a tag on HEAD and would then consider
+        # itself an official release; the release tag is only meant for the APK.
+        git tag -d "${GITHUB_REF_NAME}"
+
+    - name: Set up Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: 21
+
+    - name: Install build tools
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y ninja-build
+        yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "ndk;${NDK_VERSION}" "platforms;android-36" > /dev/null
+
+    - name: Set up vcpkg
+      run: |
+        git clone https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
+        git -C "${RUNNER_TEMP}/vcpkg" checkout "${VCPKG_COMMIT}"
+        "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+
+    - name: Cache vcpkg packages
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/vcpkg/archives
+        key: vcpkg-android-${{ env.VCPKG_COMMIT }}-${{ hashFiles('vcpkg.json') }}
+        restore-keys: |
+          vcpkg-android-${{ env.VCPKG_COMMIT }}-
+          vcpkg-android-
+
+    - name: Set up Gradle
+      uses: gradle/actions/setup-gradle@v4
+
+    - name: Configure
+      run: |
+        CMAKE_DIR="$(dirname "$(dirname "$(command -v cmake)")")"
+        # Gradle looks for ninja next to cmake.
+        [ -x "${CMAKE_DIR}/bin/ninja" ] || sudo ln -s "$(command -v ninja)" "${CMAKE_DIR}/bin/ninja"
+        cat > os/android/local.properties <<EOF
+        sdk.dir=${ANDROID_HOME}
+        cmake.dir=${CMAKE_DIR}
+        vcpkg.root=${RUNNER_TEMP}/vcpkg
+        EOF
+
+        if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+          VERSION="${GITHUB_REF_NAME#v}"
+        else
+          VERSION="dev-$(git rev-parse --short HEAD)"
+        fi
+        echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+
+    - name: Set up signing key
+      env:
+        KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      run: |
+        if [ -z "${KEYSTORE_BASE64}" ]; then
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "::error::Releases must be signed with the release key; set the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets."
+            exit 1
+          fi
+          echo "::warning::No release key configured; the APK is signed with a throwaway debug key."
+          exit 0
+        fi
+        echo "${KEYSTORE_BASE64}" | base64 -d > "${RUNNER_TEMP}/release.jks"
+        {
+          echo "OPENTTD_KEYSTORE=${RUNNER_TEMP}/release.jks"
+          echo "OPENTTD_KEYSTORE_PASSWORD=${KEYSTORE_PASSWORD}"
+          echo "OPENTTD_KEY_ALIAS=${KEY_ALIAS}"
+          echo "OPENTTD_KEY_PASSWORD=${KEY_PASSWORD}"
+        } >> "${GITHUB_ENV}"
+
+    - name: Build
+      working-directory: os/android
+      env:
+        OPENTTD_VERSION_NAME: ${{ env.VERSION }}
+      run: |
+        ./gradlew assembleRelease --console=plain
+        mkdir -p "${GITHUB_WORKSPACE}/dist"
+        cp app/build/outputs/apk/release/app-release.apk "${GITHUB_WORKSPACE}/dist/OpenTTD-${VERSION}-android-arm64.apk"
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: OpenTTD-${{ env.VERSION }}-android
+        path: dist/*.apk
+
+    - name: Publish release
+      if: github.ref_type == 'tag'
+      uses: softprops/action-gh-release@v2
+      with:
+        files: dist/*.apk
+        generate_release_notes: true
