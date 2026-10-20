@@ -338,6 +338,10 @@ if(NOT OPTION_DEDICATED)
     link_package(Harfbuzz TARGET harfbuzz::harfbuzz)
     link_package(ICU_I18N TARGET ICU::i18n)
     link_package(ICU_UC TARGET ICU::uc)
+    if(ANDROID AND TARGET ICU::data)
+        # ICU is linked statically, which needs its data library too.
+        target_link_libraries(openttd_lib ICU::data)
+    endif()
     link_package(OpusFile TARGET OpusFile::opusfile)
 
     if(SDL2_FOUND AND OPENGL_FOUND AND UNIX)

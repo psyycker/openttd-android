@@ -21,7 +21,7 @@
 #include "../window_func.h"
 #ifdef __ANDROID__
 #	include "../network/network.h"
-#	include "../saveload/saveload_func.h"
+#	include "../saveload/saveload.h"
 #	include "../os/android/android.h"
 #endif
 #include "sdl2_v.h"

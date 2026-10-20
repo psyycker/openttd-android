@@ -2530,7 +2530,7 @@ bool HandleTouchPan(Point delta)
 
 		if (w == GetMainWindow() && w->viewport->follow_vehicle != VehicleID::Invalid()) {
 			/* If the main window is following a vehicle, then first let go of it! */
-			const Vehicle *veh = Vehicle::Get(w->viewport->follow_vehicle)->GetMovingFront();
+			const Vehicle *veh = Vehicle::Get(w->viewport->follow_vehicle);
 			ScrollMainWindowTo(veh->x_pos, veh->y_pos, veh->z_pos, true); // This also resets follow_vehicle
 			return true;
 		}
