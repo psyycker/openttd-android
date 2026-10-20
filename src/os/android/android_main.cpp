@@ -12,10 +12,12 @@
 #include "../../crashlog.h"
 #include "../../core/random_func.hpp"
 #include "../../string_func.h"
+#include "android.h"
 
 #include <SDL.h>
 #include <SDL_main.h>
 #include <android/log.h>
+#include <jni.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
@@ -82,6 +84,22 @@ static void SetupDirectories()
 			__android_log_print(ANDROID_LOG_ERROR, "OpenTTD", "Cannot change to data directory %s", data_dir.c_str());
 		}
 	}
+}
+
+/** Open the settings screen of the Android app (storage location, ...); see OpenTTDActivity.openAppSettings. */
+void ShowAndroidAppSettings()
+{
+	JNIEnv *env = static_cast<JNIEnv *>(SDL_AndroidGetJNIEnv());
+	jobject activity = static_cast<jobject>(SDL_AndroidGetActivity());
+	if (env == nullptr || activity == nullptr) return;
+
+	jclass cls = env->GetObjectClass(activity);
+	jmethodID method = env->GetMethodID(cls, "openAppSettings", "()V");
+	if (method != nullptr) env->CallVoidMethod(activity, method);
+	if (env->ExceptionCheck()) env->ExceptionClear();
+
+	env->DeleteLocalRef(cls);
+	env->DeleteLocalRef(activity);
 }
 
 /* SDL_main.h renames this to SDL_main and exports it for SDLActivity. */

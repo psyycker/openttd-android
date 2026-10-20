@@ -40,7 +40,7 @@ public class StorageActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle(R.string.storage_title);
+        setTitle(R.string.app_settings_title);
 
         int pad = (int)(24 * getResources().getDisplayMetrics().density);
         LinearLayout layout = new LinearLayout(this);
@@ -48,10 +48,16 @@ public class StorageActivity extends Activity {
         layout.setPadding(pad, pad, pad, pad);
 
         TextView title = new TextView(this);
-        title.setText(R.string.storage_title);
+        title.setText(R.string.app_settings_title);
         title.setTextAppearance(android.R.style.TextAppearance_DeviceDefault_Large);
         title.setPadding(0, 0, 0, pad);
         layout.addView(title);
+
+        TextView section = new TextView(this);
+        section.setText(R.string.storage_title);
+        section.setTextAppearance(android.R.style.TextAppearance_DeviceDefault_Medium);
+        section.setPadding(0, 0, 0, pad / 2);
+        layout.addView(section);
 
         TextView intro = new TextView(this);
         intro.setText(R.string.storage_intro);

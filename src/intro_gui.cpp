@@ -35,6 +35,10 @@
 #include "widgets/intro_widget.h"
 
 #include "table/strings.h"
+
+#ifdef __ANDROID__
+#	include "os/android/android.h"
+#endif
 #include "table/sprites.h"
 
 #include "safeguards.h"
@@ -312,6 +316,9 @@ struct SelectGameWindow : public Window {
 				break;
 
 			case WID_SGI_OPTIONS:         ShowGameOptions(); break;
+#ifdef __ANDROID__
+			case WID_SGI_ANDROID_SETTINGS: ShowAndroidAppSettings(); break;
+#endif
 			case WID_SGI_HIGHSCORE:       ShowHighscoreTable(); break;
 			case WID_SGI_HELP:            ShowHelpWindow(); break;
 			case WID_SGI_CONTENT_DOWNLOAD:
@@ -360,6 +367,9 @@ static constexpr std::initializer_list<NWidgetPart> _nested_select_game_widgets 
 			/* Other */
 			NWidget(NWID_VERTICAL), SetPIP(0, WidgetDimensions::unscaled.vsep_normal, 0),
 				NWidget(WWT_PUSHIMGTEXTBTN, Colours::Orange, WID_SGI_OPTIONS), SetToolbarMinimalSize(1), SetSpriteStringTip(SPR_IMG_SETTINGS, STR_INTRO_GAME_OPTIONS, STR_INTRO_TOOLTIP_GAME_OPTIONS), SetAlignment({AlignmentH::Start, AlignmentV::Middle}), SetFill(1, 0),
+#ifdef __ANDROID__
+				NWidget(WWT_PUSHIMGTEXTBTN, Colours::Orange, WID_SGI_ANDROID_SETTINGS), SetToolbarMinimalSize(1), SetSpriteStringTip(SPR_IMG_SAVE, STR_INTRO_ANDROID_APP_SETTINGS, STR_INTRO_TOOLTIP_ANDROID_APP_SETTINGS), SetAlignment({AlignmentH::Start, AlignmentV::Middle}), SetFill(1, 0),
+#endif
 				NWidget(WWT_PUSHIMGTEXTBTN, Colours::Orange, WID_SGI_CONTENT_DOWNLOAD), SetToolbarMinimalSize(1), SetSpriteStringTip(SPR_IMG_SHOW_VEHICLES, STR_INTRO_ONLINE_CONTENT, STR_INTRO_TOOLTIP_ONLINE_CONTENT), SetAlignment({AlignmentH::Start, AlignmentV::Middle}), SetFill(1, 0),
 				NWidget(WWT_PUSHIMGTEXTBTN, Colours::Orange, WID_SGI_EDIT_SCENARIO), SetToolbarMinimalSize(1), SetSpriteStringTip(SPR_IMG_SMALLMAP, STR_INTRO_SCENARIO_EDITOR, STR_INTRO_TOOLTIP_SCENARIO_EDITOR), SetAlignment({AlignmentH::Start, AlignmentV::Middle}), SetFill(1, 0),
 				NWidget(WWT_PUSHIMGTEXTBTN, Colours::Orange, WID_SGI_HELP), SetToolbarMinimalSize(1), SetSpriteStringTip(SPR_IMG_QUERY, STR_INTRO_HELP, STR_INTRO_TOOLTIP_HELP), SetAlignment({AlignmentH::Start, AlignmentV::Middle}), SetFill(1, 0),
