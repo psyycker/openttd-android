@@ -389,8 +389,8 @@ static uint ConvertSdlKeycodeIntoMy(SDL_Keycode kc)
 /** Save the running game (if any) to the autosave folder, for when the app is closed by Android or restarted. */
 static void SaveBackgroundGame()
 {
-	if (_game_mode == GameMode::Normal && !_networking) {
-		SaveOrLoad("background.sav", SaveLoadOperation::Save, DetailedFileType::GameFile, Subdirectory::Autosave, false);
+	if (_game_mode == GM_NORMAL && !_networking) {
+		SaveOrLoad("background.sav", SLO_SAVE, DFT_GAME_FILE, AUTOSAVE_DIR, false);
 	}
 }
 

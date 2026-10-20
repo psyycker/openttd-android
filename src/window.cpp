@@ -2504,8 +2504,8 @@ void HandleBackButton()
 	}
 
 	for (Window *w : Window::IterateFromFront()) {
-		if (w->window_class == WindowClass::MainWindow || w->window_class == WindowClass::SelectGame ||
-				w->window_class == WindowClass::ToolTips || IsVitalWindow(w) || w->flags.Test(WindowFlag::Sticky)) {
+		if (w->window_class == WC_MAIN_WINDOW || w->window_class == WC_SELECT_GAME ||
+				w->window_class == WC_TOOLTIPS || IsVitalWindow(w) || w->flags.Test(WindowFlag::Sticky)) {
 			continue;
 		}
 		w->Close();
@@ -2523,10 +2523,10 @@ bool HandleTouchPan(Point delta)
 	Window *w = FindWindowFromPt(_cursor.pos.x, _cursor.pos.y);
 	if (w == nullptr || w->flags.Test(WindowFlag::DisableVpScroll)) return false;
 
-	if (w->window_class != WindowClass::SmallMap) {
+	if (w->window_class != WC_SMALLMAP) {
 		if (IsPtInWindowViewport(w, _cursor.pos.x, _cursor.pos.y) == nullptr) return false;
 		/* Don't allow any action in a viewport if either in menu or when having a modal progress window. */
-		if (_game_mode == GameMode::Menu || HasModalProgress()) return true;
+		if (_game_mode == GM_MENU || HasModalProgress()) return true;
 
 		if (w == GetMainWindow() && w->viewport->follow_vehicle != VehicleID::Invalid()) {
 			/* If the main window is following a vehicle, then first let go of it! */
@@ -2549,7 +2549,7 @@ void HandleTouchZoom(bool in)
 	Window *w = FindWindowFromPt(_cursor.pos.x, _cursor.pos.y);
 	if (w == nullptr) return;
 
-	if (w->window_class == WindowClass::SmallMap) {
+	if (w->window_class == WC_SMALLMAP) {
 		if (NWidgetCore *nwid = w->nested_root->GetWidgetFromPos(_cursor.pos.x - w->left, _cursor.pos.y - w->top); nwid != nullptr) {
 			w->OnMouseWheel(in ? -1 : 1, nwid->GetIndex());
 		}
@@ -2557,7 +2557,7 @@ void HandleTouchZoom(bool in)
 	}
 
 	if (IsPtInWindowViewport(w, _cursor.pos.x, _cursor.pos.y) == nullptr) return;
-	if (_game_mode == GameMode::Menu || HasModalProgress()) return;
+	if (_game_mode == GM_MENU || HasModalProgress()) return;
 
 	if (w->viewport->follow_vehicle != VehicleID::Invalid()) {
 		/* When following, only change zoom - otherwise zoom to the cursor. */
