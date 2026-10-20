@@ -12,6 +12,10 @@
     <!-- Online content (BaNaNaS), multiplayer and the server list. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Only when the user chooses a storage location outside of the app folder; see StorageActivity. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="29" />
     <!-- Used by SDL for game controllers. -->
     <uses-permission android:name="android.permission.VIBRATE" />
 
@@ -21,6 +25,7 @@
         android:allowBackup="true"
         android:theme="@style/OpenTTDTheme"
         android:hardwareAccelerated="true"
+        android:requestLegacyExternalStorage="true"
         android:appCategory="game"
         android:isGame="true">
 
@@ -33,7 +38,15 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <meta-data android:name="android.app.shortcuts" android:resource="@xml/shortcuts" />
         </activity>
+
+        <activity
+            android:name="org.openttd.android.StorageActivity"
+            android:exported="true"
+            android:label="@string/storage_title"
+            android:taskAffinity="org.openttd.android.storage"
+            android:theme="@style/StorageTheme" />
 
         <activity
             android:name="org.openttd.android.OpenTTDActivity"

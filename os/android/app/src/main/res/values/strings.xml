@@ -3,4 +3,35 @@
     <string name="app_name">OpenTTD</string>
     <string name="installing_data">Preparing game data…</string>
     <string name="install_failed">Could not extract the game data: %1$s</string>
+
+    <string name="storage_title">Storage location</string>
+    <string name="storage_shortcut">Storage location</string>
+    <string name="storage_intro">OpenTTD keeps its configuration, savegames, scenarios, heightmaps and downloaded content in this folder. Choose a folder outside of Android/data to manage these files with any file manager, or to keep them when the app is uninstalled.</string>
+    <string name="storage_current">Current folder:
+%1$s</string>
+    <string name="storage_choose">Choose folder…</string>
+    <string name="storage_reset">Use the default folder</string>
+    <string name="storage_grant">Grant access</string>
+    <string name="storage_permission_explain">To use a folder outside of its own app folder, OpenTTD needs the \"All files access\" permission, as the game reads and writes its files directly.</string>
+    <string name="storage_permission_missing">OpenTTD has no access to %1$s, so the default folder is used. Grant access to use your folder again.</string>
+    <string name="storage_unsupported">Please choose a folder on the device storage or an SD card.</string>
+    <string name="storage_copy_question">Copy your existing files from
+%1$s
+to
+%2$s?
+
+Files that already exist in the new folder are kept. The old folder is not changed.</string>
+    <string name="storage_copy">Copy files</string>
+    <string name="storage_no_copy">Don\'t copy</string>
+    <string name="storage_copying">Copying files…</string>
+    <string name="storage_copy_failed">Copying the files failed: %1$s
+
+The storage location has not been changed.</string>
+    <plurals name="storage_copied">
+        <item quantity="one">%d file copied.</item>
+        <item quantity="other">%d files copied.</item>
+    </plurals>
+    <string name="storage_restart">OpenTTD needs to restart to use the new folder. Your current game was saved as \"background.sav\" in the autosave folder.</string>
+    <string name="storage_restart_now">Restart now</string>
+    <string name="storage_restart_later">Later</string>
 </resources>
