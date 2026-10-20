@@ -4,6 +4,12 @@
     <string name="installing_data">Preparing game data…</string>
     <string name="install_failed">Could not extract the game data: %1$s</string>
 
+    <string name="location_title">Where to keep your games?</string>
+    <string name="location_question">OpenTTD can keep your savegames, settings and downloaded content in\n%1$s\nwhere any file manager or a computer can reach them, and where they stay when the app is uninstalled.\n\nThis needs the \"All files access\" permission. Otherwise they are kept in the app folder in Android/data.\n\nYou can change this later: long-press the app icon and choose \"Storage location\".</string>
+    <string name="location_public">Use OpenTTD folder</string>
+    <string name="location_app">Keep in app folder</string>
+    <string name="location_later">The app folder is used. You can change this later: long-press the app icon and choose \"Storage location\".</string>
+    <string name="storage_use_public">Use %1$s</string>
     <string name="storage_title">Storage location</string>
     <string name="storage_shortcut">Storage location</string>
     <string name="storage_intro">OpenTTD keeps its configuration, savegames, scenarios, heightmaps and downloaded content in this folder. Choose a folder outside of Android/data to manage these files with any file manager, or to keep them when the app is uninstalled.</string>

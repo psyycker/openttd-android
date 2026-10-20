@@ -38,6 +38,7 @@ final class StorageLocation {
     private static final String TAG = "OpenTTD";
     private static final String PREFS = "storage";
     private static final String KEY_CUSTOM_DIR = "custom_dir";
+    private static final String KEY_ASKED = "asked";
     /** Name of the personal folder within the XDG data/config homes; see PERSONAL_DIR in the CMake options. */
     private static final String PERSONAL_DIR = "openttd";
 
@@ -52,6 +53,20 @@ final class StorageLocation {
         File base = context.getExternalFilesDir(null);
         if (base == null) base = context.getFilesDir();
         return new File(base, PERSONAL_DIR);
+    }
+
+    /** The suggested folder outside of the app folder: "OpenTTD" in the root of the device storage. */
+    static File getPublicDir() {
+        return new File(Environment.getExternalStorageDirectory(), "OpenTTD");
+    }
+
+    /** Whether the user was asked where to store the files (or chose a folder already). */
+    static boolean wasAsked(Context context) {
+        return prefs(context).getBoolean(KEY_ASKED, false) || getCustomDir(context) != null;
+    }
+
+    static void setAsked(Context context) {
+        prefs(context).edit().putBoolean(KEY_ASKED, true).commit();
     }
 
     /** The folder chosen by the user, or null when the default is used. */
@@ -74,6 +89,16 @@ final class StorageLocation {
     static boolean hasAllFilesAccess(Context context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return Environment.isExternalStorageManager();
         return context.checkSelfPermission(Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    /** Ask the user for "All files access"; the activity is resumed afterwards. */
+    static void requestAllFilesAccess(android.app.Activity activity) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            activity.startActivity(new android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                    Uri.parse("package:" + activity.getPackageName())));
+        } else {
+            activity.requestPermissions(new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, 0);
+        }
     }
 
     /**
