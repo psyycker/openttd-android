@@ -27,6 +27,7 @@ enum SelectGameIntroWidgets : WidgetID {
 	WID_SGI_HELP,                  ///< Help and manuals button.
 	WID_SGI_CONTENT_DOWNLOAD,      ///< Content Download button.
 	WID_SGI_EXIT,                  ///< Exit button.
+	WID_SGI_ANDROID_SETTINGS,      ///< Android app settings button.
 };
 
 #endif /* WIDGETS_INTRO_WIDGET_H */

@@ -58,6 +58,11 @@ public class OpenTTDActivity extends SDLActivity {
         return args.trim().split("\\s+");
     }
 
+    /** Called from the game's menus (ShowAndroidAppSettings in android_main.cpp), on the game thread. */
+    public void openAppSettings() {
+        runOnUiThread(() -> startActivity(new Intent(this, StorageActivity.class)));
+    }
+
     @Override
     protected String[] getLibraries() {
         /* SDL2 and all other dependencies are linked statically into libmain.so. */
