@@ -11,5 +11,6 @@
 #define ANDROID_H
 
 void ShowAndroidAppSettings();
+bool AndroidRestartRequested();
 
 #endif /* ANDROID_H */

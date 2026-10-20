@@ -7,9 +7,13 @@
 
 package org.openttd.android;
 
+import android.app.Dialog;
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.Window;
+import android.view.WindowManager;
 
+import org.libsdl.app.SDL;
 import org.libsdl.app.SDLActivity;
 
 /**
@@ -58,9 +62,67 @@ public class OpenTTDActivity extends SDLActivity {
         return args.trim().split("\\s+");
     }
 
+    /** The app settings dialog, while shown. */
+    private Dialog settings_dialog;
+    private AppSettings settings;
+
     /** Called from the game's menus (ShowAndroidAppSettings in android_main.cpp), on the game thread. */
     public void openAppSettings() {
-        runOnUiThread(() -> startActivity(new Intent(this, StorageActivity.class)));
+        runOnUiThread(this::showAppSettings);
+    }
+
+    /** Show the app settings as a full screen dialog over the game; the game pauses meanwhile. */
+    private void showAppSettings() {
+        if (settings_dialog != null) return;
+
+        settings = new AppSettings(this, new AppSettings.Host() {
+            @Override
+            public boolean isGameRunning() {
+                return true;
+            }
+
+            @Override
+            public void restartGame() {
+                /* The game saves and quits once it runs again; then android_main.cpp calls restartApp. */
+                nativeRequestRestart();
+                close();
+            }
+
+            @Override
+            public void close() {
+                if (settings_dialog != null) settings_dialog.dismiss();
+            }
+        });
+
+        settings_dialog = new Dialog(this, R.style.AppSettingsDialog);
+        settings_dialog.setContentView(settings.createView());
+        settings_dialog.setOnDismissListener(d -> {
+            settings_dialog = null;
+            settings = null;
+        });
+        Window window = settings_dialog.getWindow();
+        if (window != null) window.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+        settings_dialog.show();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (settings != null) settings.onResume();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (settings != null) settings.onActivityResult(requestCode, resultCode, data);
+    }
+
+    /** Ask the game to save and quit, so it can be restarted; see android_main.cpp. */
+    private static native void nativeRequestRestart();
+
+    /** Called from android_main.cpp, after the game quit because of #nativeRequestRestart. */
+    public static void restartApp() {
+        RestartActivity.restart(SDL.getContext());
     }
 
     @Override

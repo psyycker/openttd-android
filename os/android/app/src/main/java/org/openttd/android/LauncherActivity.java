@@ -34,7 +34,7 @@ public class LauncherActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if (DataInstaller.isInstalled(this) && StorageLocation.wasAsked(this)) {
+        if (DataInstaller.isInstalled(this) && StorageLocation.wasAsked(this) && StorageLocation.getPendingCopy(this) == null) {
             startGame();
             return;
         }
@@ -132,6 +132,27 @@ public class LauncherActivity extends Activity {
                 .show();
     }
 
+    /** Copy the personal files to the new storage location, then start the game. */
+    private void copyThenStart(File from, File to) {
+        label.setText(R.string.storage_copying);
+        bar.setVisibility(ProgressBar.VISIBLE);
+        bar.setIndeterminate(true);
+
+        new Thread(() -> {
+            try {
+                StorageLocation.copyContents(from, to);
+                runOnUiThread(this::startGame);
+            } catch (Exception e) {
+                runOnUiThread(() -> new AlertDialog.Builder(this)
+                        .setTitle(R.string.storage_title)
+                        .setMessage(getString(R.string.storage_copy_failed_start, e.getMessage()))
+                        .setPositiveButton(android.R.string.ok, (d, w) -> startGame())
+                        .setCancelable(false)
+                        .show());
+            }
+        }, "openttd-copy").start();
+    }
+
     /** Switch to the public folder, copying the files from the app folder. */
     private void usePublicFolder() {
         File from = StorageLocation.getDefaultDir(this);
@@ -162,6 +183,16 @@ public class LauncherActivity extends Activity {
     }
 
     private void startGame() {
+        /* Files to bring along to a newly chosen storage location? */
+        File copy_from = StorageLocation.getPendingCopy(this);
+        if (copy_from != null) {
+            StorageLocation.setPendingCopy(this, null);
+            if (copy_from.isDirectory()) {
+                copyThenStart(copy_from, StorageLocation.getEffectiveDir(this));
+                return;
+            }
+        }
+
         Intent intent = new Intent(this, OpenTTDActivity.class);
         String args = getIntent().getStringExtra(EXTRA_ARGS);
         if (args != null) intent.putExtra(EXTRA_ARGS, args);
