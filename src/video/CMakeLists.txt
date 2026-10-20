@@ -10,6 +10,7 @@ if(NOT OPTION_DEDICATED)
     add_files(
         opengl.cpp
         opengl.h
+        opengl_es.h
         CONDITION OPENGL_FOUND
     )
 

@@ -199,3 +199,102 @@ static const char *_frag_shader_sprite_blend_150[] = {
 	"  colour.rgb = idx > 0.0 ? adj_brightness(remap_col.rgb, max3(rgb_col.rgb)) : rgb_col.rgb;",
 	"}",
 };
+
+/*
+ * OpenGL ES 3.0 variants of the shaders above. Palettes are stored in
+ * 256x1 2D textures, as OpenGL ES has no 1D textures.
+ */
+
+/** Vertex shader that positions a sprite on screen, for OpenGL ES 3.0. */
+static const char *_vertex_shader_sprite_es[] = {
+	"#version 300 es\n",
+	"precision highp float;",
+	"uniform vec4 sprite;",
+	"uniform vec2 screen;",
+	"in vec2 position, colour_uv;",
+	"out vec2 colour_tex_uv;",
+	"void main() {",
+	"  vec2 size = sprite.zw / screen.xy;",
+	"  vec2 offset = ((2.0 * sprite.xy + sprite.zw) / screen.xy - 1.0) * vec2(1.0, -1.0);",
+	"  colour_tex_uv = colour_uv;",
+	"  gl_Position = vec4(position * size + offset, 0.0, 1.0);",
+	"}",
+};
+
+/** Fragment shader that reads the fragment colour from a 32bpp texture, for OpenGL ES 3.0. */
+static const char *_frag_shader_direct_es[] = {
+	"#version 300 es\n",
+	"precision highp float;",
+	"uniform sampler2D colour_tex;",
+	"in vec2 colour_tex_uv;",
+	"out vec4 colour;",
+	"void main() {",
+	"  colour = texture(colour_tex, colour_tex_uv);",
+	"}",
+};
+
+/** Fragment shader that performs a palette lookup to read the colour from an 8bpp texture, for OpenGL ES 3.0. */
+static const char *_frag_shader_palette_es[] = {
+	"#version 300 es\n",
+	"precision highp float;",
+	"uniform sampler2D colour_tex;",
+	"uniform sampler2D palette;",
+	"in vec2 colour_tex_uv;",
+	"out vec4 colour;",
+	"void main() {",
+	"  float idx = texture(colour_tex, colour_tex_uv).r;",
+	"  colour = texture(palette, vec2(idx, 0.5));",
+	"}",
+};
+
+/** Fragment shader that performs a palette lookup to read the colour from an 8bpp texture, for OpenGL ES 3.0. */
+static const char *_frag_shader_rgb_mask_blend_es[] = {
+	"#version 300 es\n",
+	"precision highp float;",
+	"uniform sampler2D colour_tex;",
+	"uniform sampler2D palette;",
+	"uniform sampler2D remap_tex;",
+	"uniform float zoom;",
+	"uniform bool rgb;",
+	"in vec2 colour_tex_uv;",
+	"out vec4 colour;",
+	"",
+	_frag_shader_remap_func,
+	"",
+	"void main() {",
+	"  float idx = textureLod(remap_tex, colour_tex_uv, zoom).r;",
+	"  vec4 remap_col = texture(palette, vec2(idx, 0.5));",
+	"  vec4 rgb_col = textureLod(colour_tex, colour_tex_uv, zoom);",
+	"",
+	"  colour.a = rgb ? rgb_col.a : remap_col.a;",
+	"  colour.rgb = idx > 0.0 ? adj_brightness(remap_col.rgb, max3(rgb_col.rgb)) : rgb_col.rgb;",
+	"}",
+};
+
+/** Fragment shader used to draw a sprite with palette remap, for OpenGL ES 3.0. */
+static const char *_frag_shader_sprite_blend_es[] = {
+	"#version 300 es\n",
+	"precision highp float;",
+	"uniform sampler2D colour_tex;",
+	"uniform sampler2D palette;",
+	"uniform sampler2D remap_tex;",
+	"uniform sampler2D pal;",
+	"uniform float zoom;",
+	"uniform bool rgb;",
+	"uniform bool crash;",
+	"in vec2 colour_tex_uv;",
+	"out vec4 colour;",
+	"",
+	_frag_shader_remap_func,
+	"",
+	"void main() {",
+	"  float idx = textureLod(remap_tex, colour_tex_uv, zoom).r;",
+	"  float r = texture(pal, vec2(idx, 0.5)).r;",
+	"  vec4 remap_col = texture(palette, vec2(r, 0.5));",
+	"  vec4 rgb_col = textureLod(colour_tex, colour_tex_uv, zoom);",
+	"",
+	"  if (crash && idx == 0.0) rgb_col.rgb = vec2(dot(rgb_col.rgb, vec3(0.199325561523, 0.391342163085, 0.076004028320)), 0.0).rrr;",
+	"  colour.a = rgb && (r > 0.0 || idx == 0.0) ? rgb_col.a : remap_col.a;",
+	"  colour.rgb = idx > 0.0 ? adj_brightness(remap_col.rgb, max3(rgb_col.rgb)) : rgb_col.rgb;",
+	"}",
+};
