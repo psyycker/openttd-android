@@ -55,6 +55,23 @@ The first build takes a while, as vcpkg builds all dependencies (ICU, curl,
 OpenSSL, FreeType, HarfBuzz, SDL2, ...) for each ABI; later builds use the
 vcpkg binary cache.
 
+Release builds (`./gradlew assembleRelease`) are signed with the debug key, so
+they can be sideloaded; configure a real signing key before distributing them.
+
+### Debugging
+
+The game logs to logcat under the `OpenTTD` tag. Command line arguments can be
+passed through an intent extra, e.g. for more driver output:
+```
+adb shell am start -n org.openttd.android/.LauncherActivity --es args "'-d driver=3'"
+```
+
+### Rendering
+
+The `sdl-opengl` video driver is used, running on OpenGL ES 3.0 or newer
+(see `src/video/opengl.cpp`); when that is unavailable the game falls back to
+the software `sdl` driver.
+
 ### How it fits together
 
 - `app/src/main/java/org/libsdl/app` is SDL's Java glue, taken unmodified

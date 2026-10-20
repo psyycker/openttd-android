@@ -31,7 +31,6 @@ val openttdVersion: String = Regex("""VERSION\s+(\d+)\.(\d+)""")
 
 val hostToolsDir: File = layout.buildDirectory.dir("host-tools").get().asFile
 val gameDataDir: File = layout.buildDirectory.dir("generated/game-data").get().asFile
-val baseSetsDir: File = layout.buildDirectory.dir("generated/basesets").get().asFile
 val vcpkgInstalledDir: File = layout.buildDirectory.dir("vcpkg_installed").get().asFile
 
 android {
@@ -77,6 +76,8 @@ android {
         }
         release {
             isMinifyEnabled = false
+            /* Signed with the debug key so release builds can be sideloaded; use a real key for distribution. */
+            signingConfig = signingConfigs.getByName("debug")
             externalNativeBuild {
                 cmake {
                     arguments += "-DCMAKE_BUILD_TYPE=Release"
@@ -93,7 +94,7 @@ android {
 
     sourceSets {
         getByName("main") {
-            assets.srcDirs(gameDataDir, baseSetsDir)
+            assets.srcDirs(gameDataDir)
         }
     }
 
@@ -104,7 +105,8 @@ android {
 
     packaging {
         jniLibs {
-            useLegacyPackaging = false
+            /* libmain.so contains the ICU data and compresses well; keep the APK small. */
+            useLegacyPackaging = true
         }
     }
 }
@@ -121,20 +123,18 @@ val buildHostTools by tasks.registering(Exec::class) {
 }
 
 /* Free base sets, so the game is playable without the original TTD data files. */
-val baseSets = listOf(
-    "opengfx-releases/8.0/opengfx-8.0-all.zip",
-    "opensfx-releases/1.0.3/opensfx-1.0.3-all.zip",
-    "openmsx-releases/0.4.2/openmsx-0.4.2-all.zip",
-)
-val downloadBaseSets by tasks.registering {
-    description = "Downloads OpenGFX, OpenSFX and OpenMSX"
-    val outDir = baseSetsDir.resolve("openttd/baseset")
-    inputs.property("baseSets", baseSets)
-    outputs.dir(outDir)
-    doLast {
-        val target = outDir
+abstract class DownloadBaseSets : DefaultTask() {
+    @get:Input
+    abstract val baseSets: ListProperty<String>
+
+    @get:OutputDirectory
+    abstract val outputDir: DirectoryProperty
+
+    @TaskAction
+    fun download() {
+        val target = outputDir.get().asFile.resolve("openttd/baseset")
         target.mkdirs()
-        for (path in baseSets) {
+        for (path in baseSets.get()) {
             /* Each zip contains a single .tar, which OpenTTD reads directly. */
             URI("https://cdn.openttd.org/$path").toURL().openStream().use { stream ->
                 ZipInputStream(stream).use { zip ->
@@ -147,10 +147,25 @@ val downloadBaseSets by tasks.registering {
     }
 }
 
+val downloadBaseSets by tasks.registering(DownloadBaseSets::class) {
+    description = "Downloads OpenGFX, OpenSFX and OpenMSX"
+    baseSets.set(listOf(
+        "opengfx-releases/8.0/opengfx-8.0-all.zip",
+        "opensfx-releases/1.0.3/opensfx-1.0.3-all.zip",
+        "openmsx-releases/0.4.2/openmsx-0.4.2-all.zip",
+    ))
+}
+
+androidComponents {
+    onVariants { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(downloadBaseSets, DownloadBaseSets::outputDir)
+    }
+}
+
 tasks.configureEach {
     if (name.startsWith("configureCMake")) dependsOn(buildHostTools)
     /* The game data is produced by the native build (see ANDROID_ASSETS_DIR in CMakeLists.txt). */
     Regex("merge(\\w+)Assets").matchEntire(name)?.let {
-        dependsOn("externalNativeBuild${it.groupValues[1]}", downloadBaseSets)
+        dependsOn("externalNativeBuild${it.groupValues[1]}")
     }
 }
