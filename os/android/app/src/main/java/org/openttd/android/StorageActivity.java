@@ -7,17 +7,14 @@
 
 package org.openttd.android;
 
-import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.graphics.Insets;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Process;
-import android.provider.Settings;
 import android.view.WindowInsets;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -33,7 +30,6 @@ import java.io.File;
  */
 public class StorageActivity extends Activity {
     private static final int REQUEST_PICK_FOLDER = 1;
-    private static final int REQUEST_PERMISSION = 2;
 
     private TextView current;
     private TextView status;
@@ -65,6 +61,11 @@ public class StorageActivity extends Activity {
         current.setPadding(0, pad, 0, pad);
         current.setTextIsSelectable(true);
         layout.addView(current);
+
+        Button use_public = new Button(this);
+        use_public.setText(getString(R.string.storage_use_public, StorageLocation.getPublicDir().getAbsolutePath()));
+        use_public.setOnClickListener(v -> onFolderChosen(StorageLocation.getPublicDir()));
+        layout.addView(use_public);
 
         Button choose = new Button(this);
         choose.setText(R.string.storage_choose);
@@ -120,12 +121,7 @@ public class StorageActivity extends Activity {
     }
 
     private void requestAllFilesAccess() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:" + getPackageName()));
-            startActivity(intent);
-        } else {
-            requestPermissions(new String[] { Manifest.permission.WRITE_EXTERNAL_STORAGE }, REQUEST_PERMISSION);
-        }
+        StorageLocation.requestAllFilesAccess(this);
     }
 
     @Override
@@ -144,6 +140,11 @@ public class StorageActivity extends Activity {
             return;
         }
 
+        onFolderChosen(dir);
+    }
+
+    /** Continue with a folder chosen by the user, asking for the permission when needed. */
+    private void onFolderChosen(File dir) {
         if (StorageLocation.hasAllFilesAccess(this)) {
             changeTo(dir);
         } else {
