@@ -18,6 +18,13 @@ import org.libsdl.app.SDLActivity;
  * audio and the native main thread.
  */
 public class OpenTTDActivity extends SDLActivity {
+    /** Whether the game is running in this process. */
+    private static volatile boolean running = false;
+
+    static boolean isRunning() {
+        return running;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         /* The process may be recreated straight into this activity, e.g. after
@@ -28,7 +35,16 @@ public class OpenTTDActivity extends SDLActivity {
             finish();
             return;
         }
+        /* Must be done before the native code starts. */
+        StorageLocation.applyForNative(this);
+        running = true;
         super.onCreate(savedInstanceState);
+    }
+
+    @Override
+    protected void onDestroy() {
+        running = false;
+        super.onDestroy();
     }
 
     /**
