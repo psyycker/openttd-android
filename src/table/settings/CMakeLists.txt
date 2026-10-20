@@ -26,6 +26,8 @@ set(TABLE_INI_SOURCE_FILES
 
 if (HOST_BINARY_DIR)
     include(${HOST_BINARY_DIR}/settingsgen.cmake)
+    include(HostTools)
+    use_host_tool_in_all_configs(settingsgen)
 endif()
 
 # Generate a command and target to create the settings table

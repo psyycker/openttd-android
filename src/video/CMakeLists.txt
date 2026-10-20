@@ -18,6 +18,8 @@ if(NOT OPTION_DEDICATED)
         sdl2_v.h
         sdl2_default_v.cpp
         sdl2_default_v.h
+        sdl2_touch.cpp
+        sdl2_touch.h
         CONDITION SDL2_FOUND
     )
 

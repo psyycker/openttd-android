@@ -1,0 +1,68 @@
+## OpenTTD for Android
+
+This is the regular desktop OpenTTD, packaged as an Android app. The full
+desktop interface is kept; input is designed around a mouse:
+
+- A physical mouse (USB / Bluetooth) and keyboard work as on desktop,
+  including right-drag scrolling, the scroll wheel and all hotkeys.
+- Without a mouse the touch screen acts as a **trackpad** that moves the cursor:
+
+| Gesture                              | Action                                 |
+|--------------------------------------|----------------------------------------|
+| One finger drag                      | Move the cursor                        |
+| Tap                                  | Left click                             |
+| Double tap                           | Double click                           |
+| Tap, then touch again and drag       | Drag with the left button held (e.g. build a line of track) |
+| Two finger tap                       | Right click                            |
+| Two finger drag                      | Scroll the map, or the list under the cursor |
+| Pinch                                | Zoom the map at the cursor             |
+| Three finger tap                     | Show / hide the on-screen keyboard     |
+| Back button / gesture                | Escape (close the top window)          |
+
+Savegames, scenarios, the configuration and downloaded content are stored in
+`Android/data/org.openttd.android/files/openttd/` on the device storage, which
+is accessible over USB, so files can be copied in and out.
+The free base sets OpenGFX, OpenSFX and OpenMSX are included.
+
+### Building
+
+Requirements:
+- JDK 17 or newer,
+- the Android SDK with NDK `29.0.14206865` (see `ndkVersion` in `app/build.gradle.kts`),
+- CMake 3.31+ and Ninja on the build host, plus a host C++ compiler (for the host tools),
+- a [vcpkg](https://github.com/microsoft/vcpkg) checkout; the dependencies
+  listed in the top-level `vcpkg.json` are built for Android automatically.
+
+Create `os/android/local.properties`:
+```
+sdk.dir=/path/to/Android/Sdk
+cmake.dir=/usr
+vcpkg.root=/path/to/vcpkg
+```
+
+Then, from `os/android`:
+```
+./gradlew assembleDebug
+```
+
+The APK ends up in `app/build/outputs/apk/debug/`. Install it with
+`adb install -r app/build/outputs/apk/debug/app-debug.apk`.
+
+By default only `arm64-v8a` is built. To build other ABIs (e.g. `x86_64` for
+the emulator), set `openttd.abis=arm64-v8a,x86_64` in `local.properties`.
+
+The first build takes a while, as vcpkg builds all dependencies (ICU, curl,
+OpenSSL, FreeType, HarfBuzz, SDL2, ...) for each ABI; later builds use the
+vcpkg binary cache.
+
+### How it fits together
+
+- `app/src/main/java/org/libsdl/app` is SDL's Java glue, taken unmodified
+  from the SDL release matching the vcpkg SDL2 port.
+- `LauncherActivity` extracts the game data (packaged as APK assets) to
+  internal storage once per installed version, then starts `OpenTTDActivity`,
+  which runs the game from `libmain.so`.
+- `src/os/android/android_main.cpp` is the native entry point: it redirects
+  stdout/stderr to logcat (`adb logcat -s OpenTTD`), sets up the directories and
+  calls the normal OpenTTD main.
+- `src/video/sdl2_touch.cpp` implements the trackpad emulation.

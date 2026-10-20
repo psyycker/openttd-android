@@ -19,6 +19,10 @@
 #include "../fileio_func.h"
 #include "../framerate_type.h"
 #include "../window_func.h"
+#ifdef __ANDROID__
+#	include "../network/network.h"
+#	include "../saveload/saveload_func.h"
+#endif
 #include "sdl2_v.h"
 #include <SDL.h>
 #ifdef __EMSCRIPTEN__
@@ -156,6 +160,10 @@ bool VideoDriver_SDL_Base::CreateMainWindow(uint w, uint h, uint flags)
 
 	flags |= SDL_WINDOW_SHOWN | SDL_WINDOW_RESIZABLE;
 
+#ifdef __ANDROID__
+	/* Always use the whole screen, hiding the system bars. */
+	_fullscreen = true;
+#endif
 	if (_fullscreen) {
 		flags |= SDL_WINDOW_FULLSCREEN;
 	}
@@ -422,6 +430,19 @@ bool VideoDriver_SDL_Base::PollEvent()
 
 	switch (ev.type) {
 		case SDL_MOUSEMOTION: {
+			if (this->touch_trackpad && ev.motion.which == SDL_TOUCH_MOUSEID) break;
+			/* SDL repeats its last known mouse position when the window regains focus;
+			 * without a physical mouse that is (0, 0), which would move the trackpad cursor. */
+			if (this->touch_trackpad && ev.motion.xrel == 0 && ev.motion.yrel == 0) break;
+#ifdef __ANDROID__
+			/* The mouse pointer cannot be warped on Android; it is captured while the cursor is fixed. */
+			this->SyncPointerCapture();
+			if (SDL_GetRelativeMouseMode()) {
+				if (_cursor.fix_at) _cursor.UpdateCursorPositionRelative(ev.motion.xrel, ev.motion.yrel);
+				HandleMouseEvents();
+				break;
+			}
+#endif
 			int32_t x = ev.motion.x;
 			int32_t y = ev.motion.y;
 
@@ -462,6 +483,7 @@ bool VideoDriver_SDL_Base::PollEvent()
 		}
 
 		case SDL_MOUSEBUTTONDOWN:
+			if (this->touch_trackpad && ev.button.which == SDL_TOUCH_MOUSEID) break;
 			if (_rightclick_emulate && SDL_GetModState() & KMOD_CTRL) {
 				ev.button.button = SDL_BUTTON_RIGHT;
 			}
@@ -482,6 +504,7 @@ bool VideoDriver_SDL_Base::PollEvent()
 			break;
 
 		case SDL_MOUSEBUTTONUP:
+			if (this->touch_trackpad && ev.button.which == SDL_TOUCH_MOUSEID) break;
 			if (_rightclick_emulate) {
 				_right_button_down = false;
 				_left_button_down = false;
@@ -499,8 +522,26 @@ bool VideoDriver_SDL_Base::PollEvent()
 			HandleExitGameRequest();
 			break;
 
+#ifdef __ANDROID__
+		case SDL_APP_DIDENTERBACKGROUND:
+			/* Android may kill the app at any moment while it is in the background, so save now.
+			 * SDL blocks in the next SDL_PollEvent until the app returns, which also pauses the game. */
+			if (_game_mode == GameMode::Normal && !_networking) {
+				SaveOrLoad("background.sav", SaveLoadOperation::Save, DetailedFileType::GameFile, Subdirectory::Autosave, false);
+			}
+			break;
+#endif
+
+		case SDL_FINGERDOWN:
+		case SDL_FINGERUP:
+		case SDL_FINGERMOTION:
+			if (this->touch_trackpad) this->trackpad.HandleEvent(ev);
+			break;
+
 		case SDL_KEYDOWN: // Toggle full-screen on ALT + ENTER/F
-			if ((ev.key.keysym.mod & (KMOD_ALT | KMOD_GUI)) &&
+			if (ev.key.keysym.sym == SDLK_AC_BACK) {
+				HandleBackButton();
+			} else if ((ev.key.keysym.mod & (KMOD_ALT | KMOD_GUI)) &&
 					(ev.key.keysym.sym == SDLK_RETURN || ev.key.keysym.sym == SDLK_f)) {
 				if (ev.key.repeat == 0) ToggleFullScreen(!_fullscreen);
 			} else {
@@ -578,6 +619,15 @@ static std::optional<std::string_view> InitializeSDL()
 #ifdef SDL_HINT_APP_NAME
 	SDL_SetHint(SDL_HINT_APP_NAME, "OpenTTD");
 #endif
+#ifdef __ANDROID__
+	/* Touch input is handled as a trackpad by us (see sdl2_touch.cpp), not as mouse clicks by SDL. */
+	SDL_SetHint(SDL_HINT_TOUCH_MOUSE_EVENTS, "0");
+	SDL_SetHint(SDL_HINT_MOUSE_TOUCH_EVENTS, "0");
+	/* Deliver the back button as a key, so it closes windows instead of the app. */
+	SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+	/* The desktop interface needs the width; SDL would otherwise allow any orientation for resizable windows. */
+	SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+#endif
 
 	if (SDL_InitSubSystem(SDL_INIT_VIDEO) < 0) return SDL_GetError();
 	return std::nullopt;
@@ -635,6 +685,11 @@ std::optional<std::string_view> VideoDriver_SDL_Base::Start(const StringList &pa
 	SDL_StopTextInput();
 	this->edit_box_focused = false;
 
+#ifdef __ANDROID__
+	this->touch_trackpad = true;
+#endif
+	if (this->touch_trackpad) this->trackpad.Initialize();
+
 #ifdef __EMSCRIPTEN__
 	this->is_game_threaded = false;
 #else
@@ -673,7 +728,21 @@ void VideoDriver_SDL_Base::InputLoop()
 	_dirkeys.Set(DirectionKey::Down, keys[SDL_SCANCODE_DOWN]);
 
 	if (old_ctrl_pressed != _ctrl_pressed) HandleCtrlChanged();
+
+	if (this->touch_trackpad) this->trackpad.Tick();
+#ifdef __ANDROID__
+	this->SyncPointerCapture();
+#endif
 }
+
+#ifdef __ANDROID__
+/** Capture the mouse pointer while the cursor is fixed (scrolling), as Android cannot warp the pointer back. */
+void VideoDriver_SDL_Base::SyncPointerCapture()
+{
+	SDL_bool capture = _cursor.fix_at ? SDL_TRUE : SDL_FALSE;
+	if (SDL_GetRelativeMouseMode() != capture) SDL_SetRelativeMouseMode(capture);
+}
+#endif
 
 /** Run a single tick of the game/main loop. */
 void VideoDriver_SDL_Base::LoopOnce()

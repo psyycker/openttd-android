@@ -3,11 +3,11 @@
   "dependencies": [
     {
       "name": "breakpad",
-      "platform": "!(windows & arm)"
+      "platform": "!(windows & arm) & !android"
     },
     {
       "name": "curl",
-      "platform": "linux",
+      "platform": "linux | android",
       "features": [
         "http2"
       ]
@@ -23,15 +23,15 @@
     },
     {
       "name": "freetype",
-      "platform": "linux"
+      "platform": "linux | android"
     },
     {
       "name": "harfbuzz",
-      "platform": "linux"
+      "platform": "linux | android"
     },
     {
       "name": "icu",
-      "platform": "linux"
+      "platform": "linux | android"
     },
     {
       "name": "liblzma"
@@ -50,7 +50,7 @@
     },
     {
       "name": "sdl2",
-      "platform": "linux"
+      "platform": "linux | android"
     },
     {
       "name": "zlib"

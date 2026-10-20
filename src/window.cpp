@@ -2501,6 +2501,82 @@ static EventState HandleViewportScroll()
 }
 
 /**
+ * Handle the back button/gesture of mobile devices: cancel what is going on,
+ * otherwise close the front-most window.
+ */
+void HandleBackButton()
+{
+	if (EditBoxInGlobalFocus() || _thd.place_mode != HT_NONE) {
+		/* Cancel the text input or the selected tool, like escape does. */
+		HandleKeypress(WKC_ESC, 0);
+		return;
+	}
+
+	for (Window *w : Window::IterateFromFront()) {
+		if (w->window_class == WindowClass::MainWindow || w->window_class == WindowClass::SelectGame ||
+				w->window_class == WindowClass::ToolTips || IsVitalWindow(w) || w->flags.Test(WindowFlag::Sticky)) {
+			continue;
+		}
+		w->Close();
+		return;
+	}
+}
+
+/**
+ * Scroll the viewport under the mouse cursor by dragging it with two fingers on a touch screen.
+ * @param delta Movement of the fingers in pixels; the map follows the fingers.
+ * @return Whether there was a viewport (or small map) to scroll.
+ */
+bool HandleTouchPan(Point delta)
+{
+	Window *w = FindWindowFromPt(_cursor.pos.x, _cursor.pos.y);
+	if (w == nullptr || w->flags.Test(WindowFlag::DisableVpScroll)) return false;
+
+	if (w->window_class != WindowClass::SmallMap) {
+		if (IsPtInWindowViewport(w, _cursor.pos.x, _cursor.pos.y) == nullptr) return false;
+		/* Don't allow any action in a viewport if either in menu or when having a modal progress window. */
+		if (_game_mode == GameMode::Menu || HasModalProgress()) return true;
+
+		if (w == GetMainWindow() && w->viewport->follow_vehicle != VehicleID::Invalid()) {
+			/* If the main window is following a vehicle, then first let go of it! */
+			const Vehicle *veh = Vehicle::Get(w->viewport->follow_vehicle)->GetMovingFront();
+			ScrollMainWindowTo(veh->x_pos, veh->y_pos, veh->z_pos, true); // This also resets follow_vehicle
+			return true;
+		}
+	}
+
+	w->OnScroll({-delta.x, -delta.y});
+	return true;
+}
+
+/**
+ * Zoom the viewport under the mouse cursor, by pinching on a touch screen.
+ * @param in Whether to zoom in.
+ */
+void HandleTouchZoom(bool in)
+{
+	Window *w = FindWindowFromPt(_cursor.pos.x, _cursor.pos.y);
+	if (w == nullptr) return;
+
+	if (w->window_class == WindowClass::SmallMap) {
+		if (NWidgetCore *nwid = w->nested_root->GetWidgetFromPos(_cursor.pos.x - w->left, _cursor.pos.y - w->top); nwid != nullptr) {
+			w->OnMouseWheel(in ? -1 : 1, nwid->GetIndex());
+		}
+		return;
+	}
+
+	if (IsPtInWindowViewport(w, _cursor.pos.x, _cursor.pos.y) == nullptr) return;
+	if (_game_mode == GameMode::Menu || HasModalProgress()) return;
+
+	if (w->viewport->follow_vehicle != VehicleID::Invalid()) {
+		/* When following, only change zoom - otherwise zoom to the cursor. */
+		DoZoomInOutWindow(in ? ZOOM_IN : ZOOM_OUT, w);
+	} else {
+		ZoomInOrOutToCursorWindow(in, w);
+	}
+}
+
+/**
  * Check if a window can be made relative top-most window, and if so do
  * it. If a window does not obscure any other windows, it will not
  * be brought to the foreground. Also if the only obscuring windows

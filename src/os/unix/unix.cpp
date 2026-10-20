@@ -29,6 +29,10 @@
 #include <iconv.h>
 #endif /* WITH_ICONV */
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#endif
+
 #ifdef __EMSCRIPTEN__
 #	include <emscripten.h>
 #endif
@@ -189,7 +193,15 @@ void ShowInfoI(std::string_view str)
 	fmt::print(stderr, "{}\n", str);
 }
 
-#if !defined(__APPLE__)
+#if defined(__ANDROID__)
+void ShowOSErrorBox(std::string_view buf, bool)
+{
+	/* There is no terminal on Android; log it and show a native dialog. */
+	std::string msg(buf);
+	__android_log_print(ANDROID_LOG_ERROR, "OpenTTD", "Error: %s", msg.c_str());
+	SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "OpenTTD", msg.c_str(), nullptr);
+}
+#elif !defined(__APPLE__)
 void ShowOSErrorBox(std::string_view buf, bool)
 {
 	/* All unix systems, except OSX. Only use escape codes on a TTY. */
@@ -226,6 +238,11 @@ void OSOpenBrowser(const std::string &url)
 	/* Implementation in pre.js */
 	EM_ASM({ if (window["openttd_open_url"]) window.openttd_open_url($0, $1) }, url.data(), url.size());
 }
+#elif defined(__ANDROID__)
+void OSOpenBrowser(const std::string &url)
+{
+	SDL_OpenURL(url.c_str());
+}
 #elif !defined( __APPLE__)
 void OSOpenBrowser(const std::string &url)
 {
@@ -244,7 +261,7 @@ void OSOpenBrowser(const std::string &url)
 
 void SetCurrentThreadName([[maybe_unused]] const std::string &thread_name)
 {
-#if defined(__GLIBC__)
+#if defined(__GLIBC__) || defined(__ANDROID__)
 	pthread_setname_np(pthread_self(), thread_name.c_str());
 #endif /* defined(__GLIBC__) */
 #if defined(__APPLE__)

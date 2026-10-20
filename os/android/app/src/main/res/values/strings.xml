@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">OpenTTD</string>
+    <string name="installing_data">Preparing game data…</string>
+    <string name="install_failed">Could not extract the game data: %1$s</string>
+</resources>
