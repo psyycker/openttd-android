@@ -49,6 +49,12 @@
             android:theme="@style/StorageTheme" />
 
         <activity
+            android:name="org.openttd.android.RestartActivity"
+            android:exported="false"
+            android:process=":restart"
+            android:theme="@android:style/Theme.NoDisplay" />
+
+        <activity
             android:name="org.openttd.android.OpenTTDActivity"
             android:exported="false"
             android:launchMode="singleInstance"
