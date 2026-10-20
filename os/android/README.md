@@ -59,8 +59,24 @@ The first build takes a while, as vcpkg builds all dependencies (ICU, curl,
 OpenSSL, FreeType, HarfBuzz, SDL2, ...) for each ABI; later builds use the
 vcpkg binary cache.
 
-Release builds (`./gradlew assembleRelease`) are signed with the debug key, so
-they can be sideloaded; configure a real signing key before distributing them.
+Release builds (`./gradlew assembleRelease`) are signed with the key given by
+`openttd.keystore`, `openttd.keystorePassword`, `openttd.keyAlias` and
+`openttd.keyPassword` (Gradle properties or `local.properties`), or the
+`OPENTTD_KEYSTORE*` / `OPENTTD_KEY_*` environment variables; without one they
+are signed with the debug key. The version code is the number of commits.
+
+### Releases
+
+`.github/workflows/deploy.yml` builds the APK on GitHub Actions. Pushing a tag
+starting with `v` publishes it as a GitHub release:
+```
+git tag v1.0.0
+git push origin v1.0.0
+```
+The release key is taken from the repository secrets `ANDROID_KEYSTORE_BASE64`
+(the keystore, base64 encoded), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`
+and `ANDROID_KEY_PASSWORD`. Keep the keystore safe: updates only install over
+an APK signed with the same key.
 
 ### Debugging
 

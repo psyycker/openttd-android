@@ -29,6 +29,15 @@ val abis = (setting("openttd.abis", "OPENTTD_ABIS") ?: "arm64-v8a").split(",").m
 val openttdVersion: String = Regex("""VERSION\s+(\d+)\.(\d+)""")
     .find(openttdRoot.resolve("CMakeLists.txt").readText())!!.let { "${it.groupValues[1]}.${it.groupValues[2]}" }
 
+/* Always increasing version code for Android: the number of commits. */
+val commitCount: Int = runCatching {
+    providers.exec { commandLine("git", "-C", openttdRoot.path, "rev-list", "--count", "HEAD") }
+        .standardOutput.asText.get().trim().toInt()
+}.getOrDefault(1)
+
+/* Release signing key, e.g. from CI secrets; without it release builds are signed with the debug key. */
+val releaseKeystore = setting("openttd.keystore", "OPENTTD_KEYSTORE")
+
 val hostToolsDir: File = layout.buildDirectory.dir("host-tools").get().asFile
 val gameDataDir: File = layout.buildDirectory.dir("generated/game-data").get().asFile
 val vcpkgInstalledDir: File = layout.buildDirectory.dir("vcpkg_installed").get().asFile
@@ -42,8 +51,8 @@ android {
         applicationId = "org.openttd.android"
         minSdk = 28
         targetSdk = 36
-        versionCode = openttdVersion.split(".").let { it[0].toInt() * 10000 + it[1].toInt() * 100 }
-        versionName = "$openttdVersion-android"
+        versionCode = commitCount
+        versionName = setting("openttd.versionName", "OPENTTD_VERSION_NAME") ?: "$openttdVersion-android"
 
         ndk {
             abiFilters += abis
@@ -65,6 +74,17 @@ android {
         }
     }
 
+    signingConfigs {
+        if (releaseKeystore != null) {
+            create("release") {
+                storeFile = file(releaseKeystore)
+                storePassword = setting("openttd.keystorePassword", "OPENTTD_KEYSTORE_PASSWORD")
+                keyAlias = setting("openttd.keyAlias", "OPENTTD_KEY_ALIAS")
+                keyPassword = setting("openttd.keyPassword", "OPENTTD_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         debug {
             externalNativeBuild {
@@ -76,8 +96,8 @@ android {
         }
         release {
             isMinifyEnabled = false
-            /* Signed with the debug key so release builds can be sideloaded; use a real key for distribution. */
-            signingConfig = signingConfigs.getByName("debug")
+            /* Without a release key, sign with the debug key so the build can still be sideloaded. */
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             externalNativeBuild {
                 cmake {
                     arguments += "-DCMAKE_BUILD_TYPE=Release"
