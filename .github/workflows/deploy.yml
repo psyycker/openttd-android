@@ -1,11 +1,19 @@
 name: Deploy
 
-# Builds the Android APK; pushing a tag (e.g. v1.0.0) publishes it as a GitHub release.
+# Builds the Android APK.
+# - Pushing a tag starting with "v" on the "stable" branch (based on an OpenTTD
+#   release) publishes a release; the game identifies as that OpenTTD release,
+#   so it can join its multiplayer servers.
+# - Every night, "main" (based on OpenTTD's master) is published as the
+#   "nightly" pre-release, as a separate "OpenTTD Nightly" app.
+# - Running it manually on another branch only produces a downloadable APK.
 
 on:
   push:
     tags:
     - 'v*'
+  schedule:
+  - cron: '30 4 * * *'
   workflow_dispatch:
 
 permissions:
@@ -17,7 +25,7 @@ concurrency:
 
 env:
   NDK_VERSION: 29.0.14206865
-  # vcpkg version the dependencies are built with; the baseline in vcpkg.json must be part of its history.
+  # vcpkg version the dependencies are built with; the baselines in vcpkg.json must be part of its history.
   VCPKG_COMMIT: 65514b43a035548911e1789071785a9827470cdc
 
 jobs:
@@ -32,32 +40,68 @@ jobs:
         # The Android version code is the number of commits.
         fetch-depth: 0
 
-    - name: Use a development version string in the game
-      if: github.ref_type == 'tag'
+    - name: Determine kind of build
       run: |
-        # OpenTTD takes its version from a tag on HEAD and would then consider
-        # itself an official release; the release tag is only meant for the APK.
+        if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+          # Releases are made from the stable branch only.
+          git fetch origin stable
+          if ! git merge-base --is-ancestor "${GITHUB_SHA}" origin/stable; then
+            echo "::error::Release tags must be on the stable branch."
+            exit 1
+          fi
+          KIND=release
+          VERSION="${GITHUB_REF_NAME#v}"
+        elif [ "${GITHUB_REF_NAME}" = "main" ]; then
+          KIND=nightly
+          VERSION="nightly-$(date -u +%Y%m%d)-$(git rev-parse --short HEAD)"
+          if [ "${GITHUB_EVENT_NAME}" = "schedule" ] && [ "$(git rev-parse -q --verify 'refs/tags/nightly^{commit}')" = "$(git rev-parse HEAD)" ]; then
+            echo "Nothing changed since the last nightly."
+            KIND=none
+          fi
+        else
+          KIND=test
+          VERSION="test-$(git rev-parse --short HEAD)"
+        fi
+        # OpenTTD takes its version from a tag on HEAD; keep the development version for these builds.
+        if [ "${KIND}" != "release" ]; then git tag -d nightly 2>/dev/null || true; fi
+        echo "KIND=${KIND}" >> "${GITHUB_ENV}"
+        echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+        echo "Building ${KIND} ${VERSION}"
+
+    - name: Set the version shown in the game
+      if: env.KIND == 'release'
+      run: |
+        # OpenTTD takes its version from a tag on HEAD. Releases are OpenTTD
+        # releases with only the Android front-end added, so identify as the
+        # OpenTTD release they are based on: multiplayer needs an exact match.
+        OPENTTD_VERSION="$(sed -nE 's/^ *VERSION ([0-9]+\.[0-9]+).*/\1/p' CMakeLists.txt | head -n 1)"
         git tag -d "${GITHUB_REF_NAME}"
+        git tag -f "${OPENTTD_VERSION}" HEAD
+        echo "The game identifies as OpenTTD ${OPENTTD_VERSION}"
 
     - name: Set up Java
+      if: env.KIND != 'none'
       uses: actions/setup-java@v4
       with:
         distribution: temurin
         java-version: 21
 
     - name: Install build tools
+      if: env.KIND != 'none'
       run: |
         sudo apt-get update
-        sudo apt-get install -y ninja-build
+        sudo apt-get install -y ninja-build autoconf autoconf-archive automake libtool
         yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" "ndk;${NDK_VERSION}" "platforms;android-36" > /dev/null
 
     - name: Set up vcpkg
+      if: env.KIND != 'none'
       run: |
         git clone https://github.com/microsoft/vcpkg.git "${RUNNER_TEMP}/vcpkg"
         git -C "${RUNNER_TEMP}/vcpkg" checkout "${VCPKG_COMMIT}"
         "${RUNNER_TEMP}/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
 
     - name: Cache vcpkg packages
+      if: env.KIND != 'none'
       uses: actions/cache@v4
       with:
         path: ~/.cache/vcpkg/archives
@@ -67,9 +111,11 @@ jobs:
           vcpkg-android-
 
     - name: Set up Gradle
+      if: env.KIND != 'none'
       uses: gradle/actions/setup-gradle@v4
 
     - name: Configure
+      if: env.KIND != 'none'
       run: |
         CMAKE_DIR="$(dirname "$(dirname "$(command -v cmake)")")"
         # Gradle looks for ninja next to cmake.
@@ -80,14 +126,8 @@ jobs:
         vcpkg.root=${RUNNER_TEMP}/vcpkg
         EOF
 
-        if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-          VERSION="${GITHUB_REF_NAME#v}"
-        else
-          VERSION="dev-$(git rev-parse --short HEAD)"
-        fi
-        echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
-
     - name: Set up signing key
+      if: env.KIND != 'none'
       env:
         KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -95,8 +135,8 @@ jobs:
         KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       run: |
         if [ -z "${KEYSTORE_BASE64}" ]; then
-          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
-            echo "::error::Releases must be signed with the release key; set the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets."
+          if [ "${KIND}" != "test" ]; then
+            echo "::error::Published builds must be signed with the release key; set the ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_ALIAS and ANDROID_KEY_PASSWORD secrets."
             exit 1
           fi
           echo "::warning::No release key configured; the APK is signed with a throwaway debug key."
@@ -111,23 +151,39 @@ jobs:
         } >> "${GITHUB_ENV}"
 
     - name: Build
+      if: env.KIND != 'none'
       working-directory: os/android
       env:
         OPENTTD_VERSION_NAME: ${{ env.VERSION }}
+        OPENTTD_NIGHTLY: ${{ env.KIND == 'nightly' && '1' || '0' }}
       run: |
         ./gradlew assembleRelease --console=plain
         mkdir -p "${GITHUB_WORKSPACE}/dist"
         cp app/build/outputs/apk/release/app-release.apk "${GITHUB_WORKSPACE}/dist/OpenTTD-${VERSION}-android-arm64.apk"
 
     - name: Upload APK
+      if: env.KIND != 'none'
       uses: actions/upload-artifact@v4
       with:
         name: OpenTTD-${{ env.VERSION }}-android
         path: dist/*.apk
 
     - name: Publish release
-      if: github.ref_type == 'tag'
+      if: env.KIND == 'release'
       uses: softprops/action-gh-release@v2
       with:
         files: dist/*.apk
         generate_release_notes: true
+
+    - name: Publish nightly
+      if: env.KIND == 'nightly'
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # Move the "nightly" tag to this build and replace the previous nightly.
+        git tag -f nightly HEAD
+        git push -f origin refs/tags/nightly
+        gh release delete nightly --yes 2>/dev/null || true
+        gh release create nightly dist/*.apk --prerelease --latest=false \
+          --title "Nightly build" \
+          --notes "Automatic build of the main branch (based on OpenTTD's development version), ${VERSION}. Installs as a separate \"OpenTTD Nightly\" app; it can only play multiplayer with identical builds."

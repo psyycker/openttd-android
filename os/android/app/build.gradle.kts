@@ -35,6 +35,9 @@ val commitCount: Int = runCatching {
         .standardOutput.asText.get().trim().toInt()
 }.getOrDefault(1)
 
+/* Nightly builds are a separate app, so they can be installed next to the stable release. */
+val nightly = setting("openttd.nightly", "OPENTTD_NIGHTLY").let { it == "1" || it == "true" }
+
 /* Release signing key, e.g. from CI secrets; without it release builds are signed with the debug key. */
 val releaseKeystore = setting("openttd.keystore", "OPENTTD_KEYSTORE")
 
@@ -53,6 +56,8 @@ android {
         targetSdk = 36
         versionCode = commitCount
         versionName = setting("openttd.versionName", "OPENTTD_VERSION_NAME") ?: "$openttdVersion-android"
+        if (nightly) applicationIdSuffix = ".nightly"
+        resValue("string", "app_name", if (nightly) "OpenTTD Nightly" else "OpenTTD")
 
         ndk {
             abiFilters += abis
@@ -116,6 +121,10 @@ android {
         getByName("main") {
             assets.srcDirs(gameDataDir)
         }
+    }
+
+    buildFeatures {
+        resValues = true
     }
 
     compileOptions {
