@@ -21,9 +21,10 @@ desktop interface is kept; input is designed around a mouse:
 
 Savegames, scenarios, the configuration and downloaded content are stored in
 `Android/data/org.openttd.android/files/openttd/` on the device storage, which
-is accessible over USB, so files can be copied in and out. Another folder (e.g.
-in `Documents`) can be chosen with the "Storage location" shortcut: long-press
-the app icon. That needs the "All files access" permission, as OpenTTD uses
+is accessible over USB, so files can be copied in and out. On first start the
+app offers to use an `OpenTTD` folder in the root of the device storage instead,
+which file managers can reach and which survives uninstalling. Any other folder
+can be chosen later with the "Storage location" shortcut: long-press the app icon. That needs the "All files access" permission, as OpenTTD uses
 plain file I/O; existing files can be copied to the new folder.
 The free base sets OpenGFX, OpenSFX and OpenMSX are included.
 
