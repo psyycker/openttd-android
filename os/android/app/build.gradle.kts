@@ -25,8 +25,8 @@ val vcpkgRoot = setting("vcpkg.root", "VCPKG_ROOT")
 /* Comma separated list of ABIs to build; arm64-v8a covers practically all current devices. */
 val abis = (setting("openttd.abis", "OPENTTD_ABIS") ?: "arm64-v8a").split(",").map { it.trim() }
 
-/* Version from the main CMakeLists.txt, e.g. "project(openttd VERSION 16.0". */
-val openttdVersion: String = Regex("""VERSION\s+(\d+)\.(\d+)""")
+/* Version from the project() call in the main CMakeLists.txt: an indented line like "    VERSION 16.0". */
+val openttdVersion: String = Regex("""(?m)^\s+VERSION\s+(\d+)\.(\d+)""")
     .find(openttdRoot.resolve("CMakeLists.txt").readText())!!.let { "${it.groupValues[1]}.${it.groupValues[2]}" }
 
 /* Always increasing version code for Android: the number of commits. */
