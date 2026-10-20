@@ -18,6 +18,9 @@ import android.widget.TextView;
 
 /** Entry point: makes sure the game data is extracted, then starts the game. */
 public class LauncherActivity extends Activity {
+    /** Intent extra with command line arguments for OpenTTD; see {@link OpenTTDActivity#getArguments()}. */
+    static final String EXTRA_ARGS = "args";
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -62,7 +65,10 @@ public class LauncherActivity extends Activity {
     }
 
     private void startGame() {
-        startActivity(new Intent(this, OpenTTDActivity.class));
+        Intent intent = new Intent(this, OpenTTDActivity.class);
+        String args = getIntent().getStringExtra(EXTRA_ARGS);
+        if (args != null) intent.putExtra(EXTRA_ARGS, args);
+        startActivity(intent);
         overridePendingTransition(0, 0);
         finish();
     }

@@ -164,7 +164,10 @@ if(APPLE)
     find_library(QUARTZCORE_LIBRARY QuartzCore)
 endif()
 
-if(NOT EMSCRIPTEN AND NOT OPTION_DEDICATED)
+if(ANDROID AND NOT OPTION_DEDICATED)
+    # OpenGL ES is always available, and loaded at run time through SDL2.
+    set(OPENGL_FOUND TRUE)
+elseif(NOT EMSCRIPTEN AND NOT OPTION_DEDICATED)
     find_package(OpenGL COMPONENTS OpenGL)
 endif()
 

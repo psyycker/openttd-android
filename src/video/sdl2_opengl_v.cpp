@@ -26,8 +26,12 @@
 #include <SDL.h>
 #include <mutex>
 #include <condition_variable>
-#include <GL/gl.h>
-#include "../3rdparty/opengl/glext.h"
+#if defined(__ANDROID__)
+#	include "opengl_es.h"
+#else
+#	include <GL/gl.h>
+#	include "../3rdparty/opengl/glext.h"
+#endif
 #include "opengl.h"
 #ifdef __EMSCRIPTEN__
 #	include <emscripten.h>
@@ -108,7 +112,13 @@ std::optional<std::string_view> VideoDriver_SDL_OpenGL::AllocateContext()
 	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 0);
 	SDL_GL_SetAttribute(SDL_GL_ACCELERATED_VISUAL, 1);
+#if defined(__ANDROID__)
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_ES);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
+#else
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+#endif
 
 	if (_debug_driver_level >= 8) {
 		SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, SDL_GL_CONTEXT_DEBUG_FLAG);

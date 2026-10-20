@@ -19,13 +19,17 @@
 #endif
 
 #define GL_GLEXT_PROTOTYPES
-#if defined(__APPLE__)
-#	define GL_SILENCE_DEPRECATION
-#	include <OpenGL/gl3.h>
+#if defined(__ANDROID__)
+#	include "opengl_es.h"
 #else
-#	include <GL/gl.h>
+#	if defined(__APPLE__)
+#		define GL_SILENCE_DEPRECATION
+#		include <OpenGL/gl3.h>
+#	else
+#		include <GL/gl.h>
+#	endif
+#	include "../3rdparty/opengl/glext.h"
 #endif
-#include "../3rdparty/opengl/glext.h"
 
 #include "opengl.h"
 #include "../core/geometry_func.hpp"
@@ -193,6 +197,7 @@ static bool IsOpenGLExtensionSupported(std::string_view extension)
 
 static uint8_t _gl_major_ver = 0; ///< Major OpenGL version.
 static uint8_t _gl_minor_ver = 0; ///< Minor OpenGL version.
+static bool _gl_es = false;       ///< Whether the context is OpenGL ES; the version numbers are OpenGL ES versions then.
 
 /**
  * Check if the current OpenGL version is equal or higher than a given one.
@@ -204,6 +209,79 @@ static uint8_t _gl_minor_ver = 0; ///< Minor OpenGL version.
 bool IsOpenGLVersionAtLeast(uint8_t major, uint8_t minor)
 {
 	return (_gl_major_ver > major) || (_gl_major_ver == major && _gl_minor_ver >= minor);
+}
+
+/**
+ * Texture target for palette lookups. OpenGL ES has no 1D textures, so a 256x1 2D texture is used instead.
+ * @return The texture target.
+ */
+static GLenum PaletteTextureTarget()
+{
+	return _gl_es ? GL_TEXTURE_2D : GL_TEXTURE_1D;
+}
+
+/**
+ * Pixel format to upload \c Colour data with.
+ * OpenGL ES has no BGRA, so the data is uploaded as RGBA and the red and blue
+ * channels are swapped back by the texture swizzle; see #SetColourSwizzle.
+ * @return The pixel format.
+ */
+static GLenum ColourFormat()
+{
+	return _gl_es ? GL_RGBA : GL_BGRA;
+}
+
+/**
+ * Pixel type to upload \c Colour data with.
+ * @return The pixel type.
+ */
+static GLenum ColourType()
+{
+	return _gl_es ? GL_UNSIGNED_BYTE : GL_UNSIGNED_INT_8_8_8_8_REV;
+}
+
+/**
+ * Make the currently bound texture interpret \c Colour data correctly; see #ColourFormat.
+ * @param target Texture target.
+ */
+static void SetColourSwizzle(GLenum target)
+{
+	if (!_gl_es) return;
+	_glTexParameteri(target, GL_TEXTURE_SWIZZLE_R, GL_BLUE);
+	_glTexParameteri(target, GL_TEXTURE_SWIZZLE_B, GL_RED);
+}
+
+/**
+ * Allocate the currently bound palette lookup texture with 256 entries.
+ * @param internal_format Internal texture format.
+ * @param format Format of \a data.
+ * @param type Type of \a data.
+ * @param data Initial data, or \c nullptr.
+ */
+static void PaletteTexImage(GLint internal_format, GLenum format, GLenum type, const void *data)
+{
+	if (_gl_es) {
+		_glTexImage2D(GL_TEXTURE_2D, 0, internal_format, 256, 1, 0, format, type, data);
+	} else {
+		_glTexImage1D(GL_TEXTURE_1D, 0, internal_format, 256, 0, format, type, data);
+	}
+}
+
+/**
+ * Update entries of the currently bound palette lookup texture.
+ * @param first First entry to update.
+ * @param length Number of entries to update.
+ * @param format Format of \a data.
+ * @param type Type of \a data.
+ * @param data New data, or an offset into the bound pixel unpack buffer.
+ */
+static void PaletteTexSubImage(GLint first, GLsizei length, GLenum format, GLenum type, const void *data)
+{
+	if (_gl_es) {
+		_glTexSubImage2D(GL_TEXTURE_2D, 0, first, 0, length, 1, format, type, data);
+	} else {
+		_glTexSubImage1D(GL_TEXTURE_1D, 0, first, length, format, type, data);
+	}
 }
 
 /**
@@ -236,10 +314,10 @@ static bool BindBasicOpenGLProcs()
 	if (!BindGLProc(_glDisable, "glDisable")) return false;
 	if (!BindGLProc(_glEnable, "glEnable")) return false;
 	if (!BindGLProc(_glViewport, "glViewport")) return false;
-	if (!BindGLProc(_glTexImage1D, "glTexImage1D")) return false;
+	if (!_gl_es && !BindGLProc(_glTexImage1D, "glTexImage1D")) return false;
 	if (!BindGLProc(_glTexImage2D, "glTexImage2D")) return false;
 	if (!BindGLProc(_glTexParameteri, "glTexParameteri")) return false;
-	if (!BindGLProc(_glTexSubImage1D, "glTexSubImage1D")) return false;
+	if (!_gl_es && !BindGLProc(_glTexSubImage1D, "glTexSubImage1D")) return false;
 	if (!BindGLProc(_glTexSubImage2D, "glTexSubImage2D")) return false;
 	if (!BindGLProc(_glBindTexture, "glBindTexture")) return false;
 	if (!BindGLProc(_glDeleteTextures, "glDeleteTextures")) return false;
@@ -274,7 +352,7 @@ static bool BindVBOExtension()
 		if (!BindGLProc(_glBindBuffer, "glBindBuffer")) return false;
 		if (!BindGLProc(_glBufferData, "glBufferData")) return false;
 		if (!BindGLProc(_glBufferSubData, "glBufferSubData")) return false;
-		if (!BindGLProc(_glMapBuffer, "glMapBuffer")) return false;
+		if (!_gl_es && !BindGLProc(_glMapBuffer, "glMapBuffer")) return false;
 		if (!BindGLProc(_glUnmapBuffer, "glUnmapBuffer")) return false;
 	} else {
 		if (!BindGLProc(_glGenBuffers, "glGenBuffersARB")) return false;
@@ -429,7 +507,7 @@ void APIENTRY DebugOutputCallback([[maybe_unused]] GLenum source, GLenum type, [
 void SetupDebugOutput()
 {
 #ifndef NO_DEBUG_MESSAGES
-	if (_debug_driver_level < 6) return;
+	if (_gl_es || _debug_driver_level < 6) return;
 
 	if (IsOpenGLVersionAtLeast(4, 3)) {
 		BindGLProc(_glDebugMessageControl, "glDebugMessageControl");
@@ -546,7 +624,14 @@ std::optional<std::string_view> OpenGLBackend::Init(const Dimension &screen_res)
 	if (renderer->starts_with("llvmpipe") || renderer->starts_with("softpipe")) return "Software renderer detected, not using OpenGL";
 #endif
 
-	std::tie(_gl_major_ver, _gl_minor_ver) = DecodeVersion(*ver);
+	/* OpenGL ES reports its version as "OpenGL ES <major>.<minor> <vendor specific>". */
+	std::string_view version_number = *ver;
+	_gl_es = version_number.starts_with("OpenGL ES ");
+	if (_gl_es) version_number.remove_prefix(std::string_view("OpenGL ES ").size());
+	std::tie(_gl_major_ver, _gl_minor_ver) = DecodeVersion(version_number);
+
+	/* OpenGL ES 3.0 has everything needed, except for some desktop-only bits that are handled separately. */
+	if (_gl_es && !IsOpenGLVersionAtLeast(3, 0)) return "OpenGL ES version >= 3.0 required";
 
 #ifdef _WIN32
 	/* Old drivers on Windows (especially if made by Intel) seem to be
@@ -576,9 +661,9 @@ std::optional<std::string_view> OpenGLBackend::Init(const Dimension &screen_res)
 	/* Check for shader objects. */
 	if (!IsOpenGLVersionAtLeast(2, 0) && (!IsOpenGLExtensionSupported("GL_ARB_shader_objects") || !IsOpenGLExtensionSupported("GL_ARB_fragment_shader") || !IsOpenGLExtensionSupported("GL_ARB_vertex_shader"))) return "No shader support";
 	if (!BindShaderExtensions()) return "Failed to bind shader extension functions";
-	if (IsOpenGLVersionAtLeast(3, 2) && _glBindFragDataLocation == nullptr) return "OpenGL claims to support version 3.2 but doesn't have glBindFragDataLocation";
+	if (!_gl_es && IsOpenGLVersionAtLeast(3, 2) && _glBindFragDataLocation == nullptr) return "OpenGL claims to support version 3.2 but doesn't have glBindFragDataLocation";
 
-	this->persistent_mapping_supported = IsOpenGLVersionAtLeast(3, 0) && (IsOpenGLVersionAtLeast(4, 4) || IsOpenGLExtensionSupported("GL_ARB_buffer_storage"));
+	this->persistent_mapping_supported = !_gl_es && IsOpenGLVersionAtLeast(3, 0) && (IsOpenGLVersionAtLeast(4, 4) || IsOpenGLExtensionSupported("GL_ARB_buffer_storage"));
 #ifndef NO_GL_BUFFER_SYNC
 	this->persistent_mapping_supported = this->persistent_mapping_supported && (IsOpenGLVersionAtLeast(3, 2) || IsOpenGLExtensionSupported("GL_ARB_sync"));
 #endif
@@ -627,14 +712,15 @@ std::optional<std::string_view> OpenGLBackend::Init(const Dimension &screen_res)
 
 	/* Setup palette texture. */
 	_glGenTextures(1, &this->pal_texture);
-	_glBindTexture(GL_TEXTURE_1D, this->pal_texture);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	_glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA8, 256, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, nullptr);
-	_glBindTexture(GL_TEXTURE_1D, 0);
+	_glBindTexture(PaletteTextureTarget(), this->pal_texture);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_MAX_LEVEL, 0);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	SetColourSwizzle(PaletteTextureTarget());
+	PaletteTexImage(GL_RGBA8, ColourFormat(), ColourType(), nullptr);
+	_glBindTexture(PaletteTextureTarget(), 0);
 	if (_glGetError() != GL_NO_ERROR) return "Can't generate palette lookup texture";
 
 	/* Bind uniforms in rendering shader program. */
@@ -807,39 +893,42 @@ bool OpenGLBackend::InitShaders()
 	auto ver = GlGetString(GL_SHADING_LANGUAGE_VERSION);
 	if (!ver.has_value()) return false;
 
-	auto [glsl_major, glsl_minor] = DecodeVersion(*ver);
+	/* OpenGL ES always uses GLSL ES 3.00 shaders; its version string has a different format. */
+	auto [glsl_major, glsl_minor] = _gl_es ? std::tuple<uint8_t, uint8_t>{3, 0} : DecodeVersion(*ver);
 
 	bool glsl_150 = (IsOpenGLVersionAtLeast(3, 2) || glsl_major > 1 || (glsl_major == 1 && glsl_minor >= 5)) && _glBindFragDataLocation != nullptr;
 
+	/** Pick the shader source matching the context. */
+	auto source = [glsl_150](const auto &es, const auto &v150, const auto &v110) -> std::pair<GLsizei, const char * const *> {
+		if (_gl_es) return {static_cast<GLsizei>(std::size(es)), es};
+		if (glsl_150) return {static_cast<GLsizei>(std::size(v150)), v150};
+		return {static_cast<GLsizei>(std::size(v110)), v110};
+	};
+	auto compile = [](GLuint shader, std::pair<GLsizei, const char * const *> src) {
+		_glShaderSource(shader, src.first, src.second, nullptr);
+		_glCompileShader(shader);
+		return VerifyShader(shader);
+	};
+
 	/* Create vertex shader. */
 	GLuint vert_shader = _glCreateShader(GL_VERTEX_SHADER);
-	_glShaderSource(vert_shader, glsl_150 ? lengthof(_vertex_shader_sprite_150) : lengthof(_vertex_shader_sprite), glsl_150 ? _vertex_shader_sprite_150 : _vertex_shader_sprite, nullptr);
-	_glCompileShader(vert_shader);
-	if (!VerifyShader(vert_shader)) return false;
+	if (!compile(vert_shader, source(_vertex_shader_sprite_es, _vertex_shader_sprite_150, _vertex_shader_sprite))) return false;
 
 	/* Create fragment shader for plain RGBA. */
 	GLuint frag_shader_rgb = _glCreateShader(GL_FRAGMENT_SHADER);
-	_glShaderSource(frag_shader_rgb, glsl_150 ? lengthof(_frag_shader_direct_150) : lengthof(_frag_shader_direct), glsl_150 ? _frag_shader_direct_150 : _frag_shader_direct, nullptr);
-	_glCompileShader(frag_shader_rgb);
-	if (!VerifyShader(frag_shader_rgb)) return false;
+	if (!compile(frag_shader_rgb, source(_frag_shader_direct_es, _frag_shader_direct_150, _frag_shader_direct))) return false;
 
 	/* Create fragment shader for paletted only. */
 	GLuint frag_shader_pal = _glCreateShader(GL_FRAGMENT_SHADER);
-	_glShaderSource(frag_shader_pal, glsl_150 ? lengthof(_frag_shader_palette_150) : lengthof(_frag_shader_palette), glsl_150 ? _frag_shader_palette_150 : _frag_shader_palette, nullptr);
-	_glCompileShader(frag_shader_pal);
-	if (!VerifyShader(frag_shader_pal)) return false;
+	if (!compile(frag_shader_pal, source(_frag_shader_palette_es, _frag_shader_palette_150, _frag_shader_palette))) return false;
 
 	/* Sprite remap fragment shader. */
 	GLuint remap_shader = _glCreateShader(GL_FRAGMENT_SHADER);
-	_glShaderSource(remap_shader, glsl_150 ? lengthof(_frag_shader_rgb_mask_blend_150) : lengthof(_frag_shader_rgb_mask_blend), glsl_150 ? _frag_shader_rgb_mask_blend_150 : _frag_shader_rgb_mask_blend, nullptr);
-	_glCompileShader(remap_shader);
-	if (!VerifyShader(remap_shader)) return false;
+	if (!compile(remap_shader, source(_frag_shader_rgb_mask_blend_es, _frag_shader_rgb_mask_blend_150, _frag_shader_rgb_mask_blend))) return false;
 
 	/* Sprite fragment shader. */
 	GLuint sprite_shader = _glCreateShader(GL_FRAGMENT_SHADER);
-	_glShaderSource(sprite_shader, glsl_150 ? lengthof(_frag_shader_sprite_blend_150) : lengthof(_frag_shader_sprite_blend), glsl_150 ? _frag_shader_sprite_blend_150 : _frag_shader_sprite_blend, nullptr);
-	_glCompileShader(sprite_shader);
-	if (!VerifyShader(sprite_shader)) return false;
+	if (!compile(sprite_shader, source(_frag_shader_sprite_blend_es, _frag_shader_sprite_blend_150, _frag_shader_sprite_blend))) return false;
 
 	/* Link shaders to program. */
 	this->vid_program = _glCreateProgram();
@@ -858,7 +947,7 @@ bool OpenGLBackend::InitShaders()
 	_glAttachShader(this->sprite_program, vert_shader);
 	_glAttachShader(this->sprite_program, sprite_shader);
 
-	if (glsl_150) {
+	if (glsl_150 && !_gl_es) {
 		/* Bind fragment shader outputs. */
 		_glBindFragDataLocation(this->vid_program, 0, "colour");
 		_glBindFragDataLocation(this->pal_program, 0, "colour");
@@ -923,7 +1012,17 @@ bool OpenGLBackend::Resize(int w, int h, bool force)
 	_glPixelStorei(GL_UNPACK_ROW_LENGTH, pitch);
 
 	this->vid_buffer = nullptr;
-	if (this->persistent_mapping_supported) {
+	if (_gl_es) {
+		/* The video buffer is in normal memory, as the blitters read from it a lot and
+		 * mapped buffers are often slow to read on mobile GPUs. Dirty areas are uploaded
+		 * to the texture when the buffer is released. */
+		this->vid_shadow.assign(line_pixel_count * bpp / 8, 0);
+		if (bpp == 32) {
+			/* Initialize backing store alpha to opaque for 32bpp modes. */
+			Colour black(0, 0, 0);
+			std::fill_n(reinterpret_cast<uint32_t *>(this->vid_shadow.data()), line_pixel_count, black.data);
+		}
+	} else if (this->persistent_mapping_supported) {
 		_glDeleteBuffers(1, &this->vid_pbo);
 		_glGenBuffers(1, &this->vid_pbo);
 		_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->vid_pbo);
@@ -934,7 +1033,9 @@ bool OpenGLBackend::Resize(int w, int h, bool force)
 		_glBufferData(GL_PIXEL_UNPACK_BUFFER, line_pixel_count * bpp / 8, nullptr, GL_DYNAMIC_DRAW);
 	}
 
-	if (bpp == 32) {
+	if (_gl_es) {
+		/* Already initialized above. */
+	} else if (bpp == 32) {
 		/* Initialize backing store alpha to opaque for 32bpp modes. */
 		Colour black(0, 0, 0);
 		if (_glClearBufferSubData != nullptr) {
@@ -953,17 +1054,22 @@ bool OpenGLBackend::Resize(int w, int h, bool force)
 
 	_glActiveTexture(GL_TEXTURE0);
 	_glBindTexture(GL_TEXTURE_2D, this->vid_texture);
+	if (_gl_es) _glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 	if (bpp == 8) {
 		_glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
 	} else {
-		_glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, nullptr);
+		SetColourSwizzle(GL_TEXTURE_2D);
+		_glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, w, h, 0, ColourFormat(), ColourType(), nullptr);
 	}
 	_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
 	/* Does this blitter need a separate animation buffer? */
 	if (BlitterFactory::GetCurrentBlitter()->NeedsAnimationBuffer()) {
 		this->anim_buffer = nullptr;
-		if (this->persistent_mapping_supported) {
+		if (_gl_es) {
+			/* Initialize buffer as 0 == no remap. */
+			this->anim_shadow.assign(line_pixel_count, 0);
+		} else if (this->persistent_mapping_supported) {
 			_glDeleteBuffers(1, &this->anim_pbo);
 			_glGenBuffers(1, &this->anim_pbo);
 			_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->anim_pbo);
@@ -974,7 +1080,9 @@ bool OpenGLBackend::Resize(int w, int h, bool force)
 		}
 
 		/* Initialize buffer as 0 == no remap. */
-		if (_glClearBufferSubData != nullptr) {
+		if (_gl_es) {
+			/* Already initialized above. */
+		} else if (_glClearBufferSubData != nullptr) {
 			uint8_t b = 0;
 			_glClearBufferSubData(GL_PIXEL_UNPACK_BUFFER, GL_R8, 0, line_pixel_count, GL_RED, GL_UNSIGNED_BYTE, &b);
 		} else {
@@ -985,12 +1093,13 @@ bool OpenGLBackend::Resize(int w, int h, bool force)
 		_glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
 		_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 	} else {
-		if (this->anim_buffer != nullptr) {
+		if (this->anim_buffer != nullptr && !_gl_es) {
 			_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->anim_pbo);
 			_glUnmapBuffer(GL_PIXEL_UNPACK_BUFFER);
 			_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-			this->anim_buffer = nullptr;
 		}
+		this->anim_buffer = nullptr;
+		this->anim_shadow.clear();
 
 		/* Allocate dummy texture that always reads as 0 == no remap. */
 		uint dummy = 0;
@@ -1029,8 +1138,8 @@ void OpenGLBackend::UpdatePalette(const Colour *pal, uint first, uint length)
 	_glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
 	_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 	_glActiveTexture(GL_TEXTURE1);
-	_glBindTexture(GL_TEXTURE_1D, this->pal_texture);
-	_glTexSubImage1D(GL_TEXTURE_1D, 0, first, length, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, pal + first);
+	_glBindTexture(PaletteTextureTarget(), this->pal_texture);
+	PaletteTexSubImage(first, length, ColourFormat(), ColourType(), pal + first);
 }
 
 /**
@@ -1046,7 +1155,7 @@ void OpenGLBackend::Paint()
 	_glActiveTexture(GL_TEXTURE0);
 	_glBindTexture(GL_TEXTURE_2D, this->vid_texture);
 	_glActiveTexture(GL_TEXTURE1);
-	_glBindTexture(GL_TEXTURE_1D, this->pal_texture);
+	_glBindTexture(PaletteTextureTarget(), this->pal_texture);
 	/* Is the blitter relying on a separate animation buffer? */
 	if (BlitterFactory::GetCurrentBlitter()->NeedsAnimationBuffer()) {
 		_glActiveTexture(GL_TEXTURE2);
@@ -1147,6 +1256,11 @@ void OpenGLBackend::ClearCursorCache()
  */
 void *OpenGLBackend::GetVideoBuffer()
 {
+	if (_gl_es) {
+		this->vid_buffer = this->vid_shadow.data();
+		return this->vid_buffer;
+	}
+
 #ifndef NO_GL_BUFFER_SYNC
 	if (this->sync_vid_mapping != nullptr) _glClientWaitSync(this->sync_vid_mapping, GL_SYNC_FLUSH_COMMANDS_BIT, 100000000); // 100ms timeout.
 #endif
@@ -1171,6 +1285,11 @@ uint8_t *OpenGLBackend::GetAnimBuffer()
 {
 	if (this->anim_pbo == 0) return nullptr;
 
+	if (_gl_es) {
+		this->anim_buffer = this->anim_shadow.empty() ? nullptr : this->anim_shadow.data();
+		return static_cast<uint8_t *>(this->anim_buffer);
+	}
+
 #ifndef NO_GL_BUFFER_SYNC
 	if (this->sync_anim_mapping != nullptr) _glClientWaitSync(this->sync_anim_mapping, GL_SYNC_FLUSH_COMMANDS_BIT, 100000000); // 100ms timeout.
 #endif
@@ -1193,6 +1312,25 @@ uint8_t *OpenGLBackend::GetAnimBuffer()
 void OpenGLBackend::ReleaseVideoBuffer(const Rect &update_rect)
 {
 	assert(this->vid_pbo != 0);
+
+	if (_gl_es) {
+		/* Upload straight from the buffer in normal memory. */
+		_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+		this->vid_buffer = nullptr;
+		if (!IsEmptyRect(update_rect)) {
+			int bytes_per_pixel = BlitterFactory::GetCurrentBlitter()->GetScreenDepth() / 8;
+			const uint8_t *src = this->vid_shadow.data() + (static_cast<size_t>(update_rect.top) * _screen.pitch + update_rect.left) * bytes_per_pixel;
+			_glActiveTexture(GL_TEXTURE0);
+			_glBindTexture(GL_TEXTURE_2D, this->vid_texture);
+			_glPixelStorei(GL_UNPACK_ROW_LENGTH, _screen.pitch);
+			if (bytes_per_pixel == 1) {
+				_glTexSubImage2D(GL_TEXTURE_2D, 0, update_rect.left, update_rect.top, update_rect.right - update_rect.left, update_rect.bottom - update_rect.top, GL_RED, GL_UNSIGNED_BYTE, src);
+			} else {
+				_glTexSubImage2D(GL_TEXTURE_2D, 0, update_rect.left, update_rect.top, update_rect.right - update_rect.left, update_rect.bottom - update_rect.top, ColourFormat(), ColourType(), src);
+			}
+		}
+		return;
+	}
 
 	_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->vid_pbo);
 	if (!this->persistent_mapping_supported) {
@@ -1231,6 +1369,20 @@ void OpenGLBackend::ReleaseVideoBuffer(const Rect &update_rect)
 void OpenGLBackend::ReleaseAnimBuffer(const Rect &update_rect)
 {
 	if (this->anim_pbo == 0) return;
+
+	if (_gl_es) {
+		/* Upload straight from the buffer in normal memory. */
+		_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+		this->anim_buffer = nullptr;
+		if (update_rect.left != update_rect.right && !this->anim_shadow.empty()) {
+			const uint8_t *src = this->anim_shadow.data() + static_cast<size_t>(update_rect.top) * _screen.pitch + update_rect.left;
+			_glActiveTexture(GL_TEXTURE0);
+			_glBindTexture(GL_TEXTURE_2D, this->anim_texture);
+			_glPixelStorei(GL_UNPACK_ROW_LENGTH, _screen.pitch);
+			_glTexSubImage2D(GL_TEXTURE_2D, 0, update_rect.left, update_rect.top, update_rect.right - update_rect.left, update_rect.bottom - update_rect.top, GL_RED, GL_UNSIGNED_BYTE, src);
+		}
+		return;
+	}
 
 	_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, this->anim_pbo);
 	if (!this->persistent_mapping_supported) {
@@ -1279,26 +1431,31 @@ void OpenGLBackend::RenderOglSprite(const OpenGLSprite *gl_sprite, PaletteID pal
 	/* Set textures. */
 	bool rgb = gl_sprite->BindTextures();
 	_glActiveTexture(GL_TEXTURE0 + 1);
-	_glBindTexture(GL_TEXTURE_1D, this->pal_texture);
+	_glBindTexture(PaletteTextureTarget(), this->pal_texture);
 
 	/* Set palette remap. */
 	_glActiveTexture(GL_TEXTURE0 + 3);
 	if (pal != PAL_NONE) {
-		_glBindTexture(GL_TEXTURE_1D, OpenGLSprite::pal_tex);
+		_glBindTexture(PaletteTextureTarget(), OpenGLSprite::pal_tex);
 		if (pal != this->last_sprite_pal) {
 			/* Different remap palette in use, update texture. */
-			_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, OpenGLSprite::pal_pbo);
+			const uint8_t *remap = GetNonSprite(GB(pal, 0, PALETTE_WIDTH), SpriteType::Recolour) + 1;
 			_glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-
-			_glBufferSubData(GL_PIXEL_UNPACK_BUFFER, 0, 256, GetNonSprite(GB(pal, 0, PALETTE_WIDTH), SpriteType::Recolour) + 1);
-			_glTexSubImage1D(GL_TEXTURE_1D, 0, 0, 256, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+			if (_gl_es) {
+				_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+				PaletteTexSubImage(0, 256, GL_RED, GL_UNSIGNED_BYTE, remap);
+			} else {
+				_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, OpenGLSprite::pal_pbo);
+				_glBufferSubData(GL_PIXEL_UNPACK_BUFFER, 0, 256, remap);
+				PaletteTexSubImage(0, 256, GL_RED, GL_UNSIGNED_BYTE, nullptr);
+			}
 
 			_glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
 
 			this->last_sprite_pal = pal;
 		}
 	} else {
-		_glBindTexture(GL_TEXTURE_1D, OpenGLSprite::pal_identity);
+		_glBindTexture(PaletteTextureTarget(), OpenGLSprite::pal_identity);
 	}
 
 	/* Set up shader program. */
@@ -1344,7 +1501,8 @@ void OpenGLBackend::RenderOglSprite(const OpenGLSprite *gl_sprite, PaletteID pal
 	/* Load dummy RGBA texture. */
 	const Colour rgb_pixel(0, 0, 0);
 	_glBindTexture(GL_TEXTURE_2D, OpenGLSprite::dummy_tex[TEX_RGBA]);
-	_glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, &rgb_pixel);
+	SetColourSwizzle(GL_TEXTURE_2D);
+	_glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 1, 1, 0, ColourFormat(), ColourType(), &rgb_pixel);
 
 	/* Load dummy remap texture. */
 	const uint pal = 0;
@@ -1357,23 +1515,23 @@ void OpenGLBackend::RenderOglSprite(const OpenGLSprite *gl_sprite, PaletteID pal
 
 	/* Permanent texture for identity remap. */
 	_glGenTextures(1, &OpenGLSprite::pal_identity);
-	_glBindTexture(GL_TEXTURE_1D, OpenGLSprite::pal_identity);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	_glTexImage1D(GL_TEXTURE_1D, 0, GL_R8, 256, 0, GL_RED, GL_UNSIGNED_BYTE, identity_pal.data());
+	_glBindTexture(PaletteTextureTarget(), OpenGLSprite::pal_identity);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_MAX_LEVEL, 0);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	PaletteTexImage(GL_R8, GL_RED, GL_UNSIGNED_BYTE, identity_pal.data());
 
 	/* Dynamically updated texture for remaps. */
 	_glGenTextures(1, &OpenGLSprite::pal_tex);
-	_glBindTexture(GL_TEXTURE_1D, OpenGLSprite::pal_tex);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAX_LEVEL, 0);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-	_glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	_glTexImage1D(GL_TEXTURE_1D, 0, GL_R8, 256, 0, GL_RED, GL_UNSIGNED_BYTE, identity_pal.data());
+	_glBindTexture(PaletteTextureTarget(), OpenGLSprite::pal_tex);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_MAX_LEVEL, 0);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	_glTexParameteri(PaletteTextureTarget(), GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	PaletteTexImage(GL_R8, GL_RED, GL_UNSIGNED_BYTE, identity_pal.data());
 
 	/* Pixel buffer for remap updates. */
 	_glGenBuffers(1, &OpenGLSprite::pal_pbo);
@@ -1427,6 +1585,7 @@ OpenGLSprite::OpenGLSprite(SpriteType sprite_type, const SpriteLoader::SpriteCol
 		_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, levels - 1);
 		_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 		_glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		if (t == TEX_RGBA) SetColourSwizzle(GL_TEXTURE_2D);
 
 		/* Set size. */
 		for (int i = 0, w = this->dim.width, h = this->dim.height; i < levels; i++, w /= 2, h /= 2) {
@@ -1434,7 +1593,7 @@ OpenGLSprite::OpenGLSprite(SpriteType sprite_type, const SpriteLoader::SpriteCol
 			if (t == TEX_REMAP) {
 				_glTexImage2D(GL_TEXTURE_2D, i, GL_R8, w, h, 0, GL_RED, GL_UNSIGNED_BYTE, nullptr);
 			} else {
-				_glTexImage2D(GL_TEXTURE_2D, i, GL_RGBA8, w, h, 0, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, nullptr);
+				_glTexImage2D(GL_TEXTURE_2D, i, GL_RGBA8, w, h, 0, ColourFormat(), ColourType(), nullptr);
 			}
 		}
 	}
@@ -1481,7 +1640,7 @@ void OpenGLSprite::Update(uint width, uint height, uint level, const SpriteLoade
 		}
 
 		_glBindTexture(GL_TEXTURE_2D, this->tex[TEX_RGBA]);
-		_glTexSubImage2D(GL_TEXTURE_2D, level, 0, 0, width, height, GL_BGRA, GL_UNSIGNED_INT_8_8_8_8_REV, rgba);
+		_glTexSubImage2D(GL_TEXTURE_2D, level, 0, 0, width, height, ColourFormat(), ColourType(), rgba);
 	}
 
 	if (this->tex[TEX_REMAP] != 0) {
