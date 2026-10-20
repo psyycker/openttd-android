@@ -17,6 +17,7 @@
 #include <SDL.h>
 #include <SDL_main.h>
 #include <android/log.h>
+#include <atomic>
 #include <jni.h>
 #include <pthread.h>
 #include <signal.h>
@@ -86,6 +87,45 @@ static void SetupDirectories()
 	}
 }
 
+/** Whether the app settings asked for a restart, e.g. because the storage location changed. */
+static std::atomic<bool> _restart_requested = false;
+/** Whether the game quit to be restarted. */
+static bool _restarting = false;
+
+/** Called by OpenTTDActivity.nativeRequestRestart, on the Java UI thread. */
+extern "C" JNIEXPORT void JNICALL Java_org_openttd_android_OpenTTDActivity_nativeRequestRestart(JNIEnv *, jclass)
+{
+	_restart_requested = true;
+}
+
+/**
+ * Check whether the app asked to restart the game; the video driver then saves the game and quits.
+ * @return True once after a restart was requested.
+ */
+bool AndroidRestartRequested()
+{
+	if (!_restart_requested.exchange(false)) return false;
+	_restarting = true;
+	return true;
+}
+
+/** Ask the Java side to start the app again, once this process has ended. */
+static void RestartApp()
+{
+	JNIEnv *env = static_cast<JNIEnv *>(SDL_AndroidGetJNIEnv());
+	if (env == nullptr) return;
+
+	jclass cls = env->FindClass("org/openttd/android/OpenTTDActivity");
+	if (cls == nullptr) {
+		env->ExceptionClear();
+		return;
+	}
+	jmethodID method = env->GetStaticMethodID(cls, "restartApp", "()V");
+	if (method != nullptr) env->CallStaticVoidMethod(cls, method);
+	if (env->ExceptionCheck()) env->ExceptionClear();
+	env->DeleteLocalRef(cls);
+}
+
 /** Open the settings screen of the Android app (storage location, ...); see OpenTTDActivity.openAppSettings. */
 void ShowAndroidAppSettings()
 {
@@ -122,6 +162,9 @@ int main(int argc, char *argv[])
 	signal(SIGPIPE, SIG_IGN);
 
 	int ret = openttd_main(params);
+
+	/* Everything has been saved by now; start again in a new process. */
+	if (_restarting) RestartApp();
 
 	/* The process is kept alive by Android; make sure the next start is clean. */
 	exit(ret);

@@ -22,6 +22,7 @@
 #ifdef __ANDROID__
 #	include "../network/network.h"
 #	include "../saveload/saveload_func.h"
+#	include "../os/android/android.h"
 #endif
 #include "sdl2_v.h"
 #include <SDL.h>
@@ -422,6 +423,17 @@ static uint ConvertSdlKeycodeIntoMy(SDL_Keycode kc)
 	return key;
 }
 
+#ifdef __ANDROID__
+/** Save the running game (if any) to the autosave folder, for when the app is closed by Android or restarted. */
+static void SaveBackgroundGame()
+{
+	if (_game_mode == GameMode::Normal && !_networking) {
+		SaveOrLoad("background.sav", SaveLoadOperation::Save, DetailedFileType::GameFile, Subdirectory::Autosave, false);
+	}
+}
+
+#endif
+
 bool VideoDriver_SDL_Base::PollEvent()
 {
 	SDL_Event ev;
@@ -526,9 +538,7 @@ bool VideoDriver_SDL_Base::PollEvent()
 		case SDL_APP_DIDENTERBACKGROUND:
 			/* Android may kill the app at any moment while it is in the background, so save now.
 			 * SDL blocks in the next SDL_PollEvent until the app returns, which also pauses the game. */
-			if (_game_mode == GameMode::Normal && !_networking) {
-				SaveOrLoad("background.sav", SaveLoadOperation::Save, DetailedFileType::GameFile, Subdirectory::Autosave, false);
-			}
+			SaveBackgroundGame();
 			break;
 #endif
 
@@ -732,6 +742,12 @@ void VideoDriver_SDL_Base::InputLoop()
 	if (this->touch_trackpad) this->trackpad.Tick();
 #ifdef __ANDROID__
 	this->SyncPointerCapture();
+
+	/* The app settings changed something that needs a restart; save and quit, android_main.cpp restarts the app. */
+	if (AndroidRestartRequested()) {
+		SaveBackgroundGame();
+		_exit_game = true;
+	}
 #endif
 }
 

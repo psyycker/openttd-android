@@ -39,6 +39,7 @@ final class StorageLocation {
     private static final String PREFS = "storage";
     private static final String KEY_CUSTOM_DIR = "custom_dir";
     private static final String KEY_ASKED = "asked";
+    private static final String KEY_PENDING_COPY = "pending_copy";
     /** Name of the personal folder within the XDG data/config homes; see PERSONAL_DIR in the CMake options. */
     private static final String PERSONAL_DIR = "openttd";
 
@@ -67,6 +68,21 @@ final class StorageLocation {
 
     static void setAsked(Context context) {
         prefs(context).edit().putBoolean(KEY_ASKED, true).commit();
+    }
+
+    /**
+     * Remember to copy the files from a folder into the current one when the game
+     * starts the next time; see LauncherActivity.
+     * @param from The folder to copy from, or null to not copy anything.
+     */
+    static void setPendingCopy(Context context, File from) {
+        prefs(context).edit().putString(KEY_PENDING_COPY, from == null ? null : from.getAbsolutePath()).commit();
+    }
+
+    /** The folder to copy files from before the game starts, or null. */
+    static File getPendingCopy(Context context) {
+        String dir = prefs(context).getString(KEY_PENDING_COPY, null);
+        return dir == null ? null : new File(dir);
     }
 
     /** The folder chosen by the user, or null when the default is used. */
@@ -142,7 +158,8 @@ final class StorageLocation {
     }
 
     /**
-     * Copy all files from one folder into another; existing files are kept.
+     * Copy all files from one folder into another; existing files are only
+     * replaced by newer ones.
      * @return Number of files copied.
      */
     static int copyContents(File from, File to) throws IOException {
@@ -156,7 +173,7 @@ final class StorageLocation {
             File target = new File(to, child.getName());
             if (child.isDirectory()) {
                 copied += copyContents(child, target);
-            } else if (!target.exists()) {
+            } else if (!target.exists() || child.lastModified() > target.lastModified()) {
                 try (InputStream in = new FileInputStream(child); OutputStream out = new FileOutputStream(target)) {
                     int n;
                     while ((n = in.read(buffer)) > 0) out.write(buffer, 0, n);
