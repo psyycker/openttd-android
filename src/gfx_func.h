@@ -75,6 +75,9 @@ void HandleTextInput(std::string_view str, bool marked = false,
 		std::optional<size_t> insert_location = std::nullopt, std::optional<size_t> replacement_end = std::nullopt);
 void HandleCtrlChanged();
 void HandleMouseEvents();
+bool HandleTouchPan(Point delta);
+void HandleBackButton();
+void HandleTouchZoom(bool in);
 void UpdateWindows();
 void ChangeGameSpeed(bool enable_fast_forward);
 
