@@ -10,6 +10,9 @@ package org.openttd.android;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.ShortcutInfo;
+import android.content.pm.ShortcutManager;
+import android.graphics.drawable.Icon;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.widget.LinearLayout;
@@ -19,6 +22,7 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Collections;
 
 /** Entry point: makes sure the game data is extracted, then starts the game. */
 public class LauncherActivity extends Activity {
@@ -33,6 +37,7 @@ public class LauncherActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        addAppShortcuts();
 
         if (DataInstaller.isInstalled(this) && StorageLocation.wasAsked(this) && StorageLocation.getPendingCopy(this) == null) {
             startGame();
@@ -81,6 +86,18 @@ public class LauncherActivity extends Activity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         /* Handled in onResume, which is called after this. */
+    }
+
+    /** Add "App settings" to the menu of the app icon (long-press). */
+    private void addAppShortcuts() {
+        ShortcutManager manager = getSystemService(ShortcutManager.class);
+        if (manager == null) return;
+        ShortcutInfo settings = new ShortcutInfo.Builder(this, "settings")
+                .setShortLabel(getString(R.string.storage_shortcut))
+                .setIcon(Icon.createWithResource(this, R.mipmap.ic_launcher))
+                .setIntent(new Intent(Intent.ACTION_VIEW).setClass(this, StorageActivity.class))
+                .build();
+        manager.setDynamicShortcuts(Collections.singletonList(settings));
     }
 
     /** Extract the game data from the APK, then continue the start up. */
