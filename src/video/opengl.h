@@ -45,6 +45,8 @@ private:
 
 	void *anim_buffer = nullptr; ///< Pointer to the mapped animation buffer.
 	GLuint anim_pbo = 0; ///< Pixel buffer object storing the memory used for the animation buffer.
+	std::vector<uint8_t> vid_shadow; ///< OpenGL ES: video buffer in normal memory, uploaded to #vid_texture.
+	std::vector<uint8_t> anim_shadow; ///< OpenGL ES: animation buffer in normal memory, uploaded to #anim_texture.
 	GLuint anim_texture = 0; ///< Texture handle for the animation buffer texture.
 
 	GLuint remap_program = 0; ///< Shader program for blending and rendering a RGBA + remap texture.

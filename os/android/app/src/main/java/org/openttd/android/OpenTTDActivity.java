@@ -31,6 +31,17 @@ public class OpenTTDActivity extends SDLActivity {
         super.onCreate(savedInstanceState);
     }
 
+    /**
+     * Command line arguments for OpenTTD can be passed for debugging, e.g.
+     * {@code adb shell am start -n org.openttd.android/.LauncherActivity --es args "-d driver=3"}.
+     */
+    @Override
+    protected String[] getArguments() {
+        String args = getIntent().getStringExtra(LauncherActivity.EXTRA_ARGS);
+        if (args == null || args.trim().isEmpty()) return new String[0];
+        return args.trim().split("\\s+");
+    }
+
     @Override
     protected String[] getLibraries() {
         /* SDL2 and all other dependencies are linked statically into libmain.so. */
