@@ -18,6 +18,8 @@ import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
+import android.widget.RadioButton;
+import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -40,6 +42,8 @@ final class AppSettings {
         void restartGame();
         /** Close the settings. */
         void close();
+        /** The touch controls settings changed. */
+        default void onControlsChanged() {}
     }
 
     private final Activity activity;
@@ -80,6 +84,36 @@ final class AppSettings {
         close.setOnClickListener(v -> host.close());
         header.addView(close, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.END | Gravity.CENTER_VERTICAL));
         layout.addView(header);
+
+        /* Controls. */
+        TextView controls = new TextView(activity);
+        controls.setText(R.string.controls_title);
+        controls.setTextAppearance(android.R.style.TextAppearance_DeviceDefault_Medium);
+        controls.setPadding(0, pad, 0, pad / 2);
+        layout.addView(controls);
+
+        TextView joystick_label = new TextView(activity);
+        joystick_label.setText(R.string.controls_joystick);
+        layout.addView(joystick_label);
+
+        RadioGroup joystick = new RadioGroup(activity);
+        joystick.setOrientation(RadioGroup.HORIZONTAL);
+        int[] labels = { R.string.controls_joystick_off, R.string.controls_joystick_left, R.string.controls_joystick_right };
+        Controls.Joystick[] values = Controls.Joystick.values();
+        for (int i = 0; i < values.length; i++) {
+            RadioButton option = new RadioButton(activity);
+            option.setId(View.generateViewId());
+            option.setText(labels[i]);
+            option.setChecked(Controls.getJoystick(activity) == values[i]);
+            Controls.Joystick value = values[i];
+            option.setOnCheckedChangeListener((b, checked) -> {
+                if (!checked) return;
+                Controls.setJoystick(activity, value);
+                host.onControlsChanged();
+            });
+            joystick.addView(option);
+        }
+        layout.addView(joystick);
 
         TextView section = new TextView(activity);
         section.setText(R.string.storage_title);

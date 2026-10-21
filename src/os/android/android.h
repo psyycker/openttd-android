@@ -12,5 +12,6 @@
 
 void ShowAndroidAppSettings();
 bool AndroidRestartRequested();
+void AndroidGetJoystick(float &x, float &y);
 
 #endif /* ANDROID_H */

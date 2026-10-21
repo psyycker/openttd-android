@@ -12,6 +12,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.RelativeLayout;
 
 import org.libsdl.app.SDL;
 import org.libsdl.app.SDLActivity;
@@ -92,6 +93,11 @@ public class OpenTTDActivity extends SDLActivity {
             public void close() {
                 if (settings_dialog != null) settings_dialog.dismiss();
             }
+
+            @Override
+            public void onControlsChanged() {
+                updateJoystick();
+            }
         });
 
         settings_dialog = new Dialog(this, R.style.AppSettingsDialog);
@@ -109,6 +115,33 @@ public class OpenTTDActivity extends SDLActivity {
     protected void onResume() {
         super.onResume();
         if (settings != null) settings.onResume();
+        updateJoystick();
+    }
+
+    /** The on-screen joystick for scrolling the map, while shown. */
+    private JoystickView joystick;
+
+    /** Show, move or hide the on-screen joystick, following the settings. */
+    private void updateJoystick() {
+        if (mLayout == null) return;
+        if (joystick != null) {
+            mLayout.removeView(joystick);
+            joystick = null;
+        }
+
+        Controls.Joystick setting = Controls.getJoystick(this);
+        if (setting == Controls.Joystick.OFF) return;
+
+        float density = getResources().getDisplayMetrics().density;
+        int size = (int)(140 * density);
+        int margin = (int)(24 * density);
+        RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(size, size);
+        params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+        params.addRule(setting == Controls.Joystick.LEFT ? RelativeLayout.ALIGN_PARENT_LEFT : RelativeLayout.ALIGN_PARENT_RIGHT);
+        params.setMargins(margin, margin, margin, margin);
+
+        joystick = new JoystickView(this);
+        mLayout.addView(joystick, params);
     }
 
     @Override
