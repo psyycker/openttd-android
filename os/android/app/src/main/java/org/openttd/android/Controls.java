@@ -10,7 +10,10 @@ package org.openttd.android;
 import android.content.Context;
 import android.content.SharedPreferences;
 
-/** Settings for the touch controls of the app. */
+/**
+ * Settings for the touch controls of older versions of the app; only read to
+ * create the first ControlLayout, which replaces them.
+ */
 final class Controls {
     private static final String PREFS = "controls";
     /** Old setting: OFF, LEFT or RIGHT; replaced by KEY_SIDE and KEY_JOYSTICK_SHOWN. */
@@ -38,26 +41,14 @@ final class Controls {
         }
     }
 
-    static void setSide(Context context, Side side) {
-        prefs(context).edit().putString(KEY_SIDE, side.name()).apply();
-    }
-
     /** Whether to show the on-screen joystick to scroll the map. */
     static boolean getJoystick(Context context) {
         String old = prefs(context).getString(KEY_JOYSTICK, null);
         return prefs(context).getBoolean(KEY_JOYSTICK_SHOWN, old != null && !"OFF".equals(old));
     }
 
-    static void setJoystick(Context context, boolean show) {
-        prefs(context).edit().putBoolean(KEY_JOYSTICK_SHOWN, show).apply();
-    }
-
     /** Whether to show on-screen left and right mouse buttons. */
     static boolean getClickButtons(Context context) {
         return prefs(context).getBoolean(KEY_CLICK_BUTTONS, false);
-    }
-
-    static void setClickButtons(Context context, boolean show) {
-        prefs(context).edit().putBoolean(KEY_CLICK_BUTTONS, show).apply();
     }
 }

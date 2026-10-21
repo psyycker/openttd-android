@@ -96,8 +96,14 @@ public class OpenTTDActivity extends SDLActivity {
             }
 
             @Override
-            public void onControlsChanged() {
-                updateJoystick();
+            public boolean canEditControls() {
+                return true;
+            }
+
+            @Override
+            public void editControls() {
+                close();
+                if (controls != null) controls.startEditing();
             }
         });
 
@@ -116,71 +122,12 @@ public class OpenTTDActivity extends SDLActivity {
     protected void onResume() {
         super.onResume();
         if (settings != null) settings.onResume();
-        updateJoystick();
+        if (controls == null && mLayout instanceof RelativeLayout) controls = new OnScreenControls(this, (RelativeLayout)mLayout);
+        if (controls != null) controls.refresh();
     }
 
-    /** The on-screen joystick for scrolling the map, while shown. */
-    private JoystickView joystick;
-    /** The on-screen left and right mouse buttons, while shown. */
-    private ClickButtonView left_button, right_button;
-
-    /** Show, move or hide the on-screen joystick and mouse buttons, following the settings. */
-    private void updateJoystick() {
-        if (mLayout == null) return;
-        for (View v : new View[] { joystick, left_button, right_button }) {
-            if (v != null) mLayout.removeView(v);
-        }
-        joystick = null;
-        left_button = right_button = null;
-
-        boolean show_joystick = Controls.getJoystick(this);
-        boolean buttons = Controls.getClickButtons(this);
-        boolean on_left = Controls.getSide(this) == Controls.Side.LEFT;
-        float density = getResources().getDisplayMetrics().density;
-        int margin = (int)(24 * density);
-
-        if (show_joystick) {
-            int size = (int)(140 * density);
-            RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(size, size);
-            params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-            params.addRule(on_left ? RelativeLayout.ALIGN_PARENT_LEFT : RelativeLayout.ALIGN_PARENT_RIGHT);
-            params.setMargins(margin, margin, margin, margin);
-
-            joystick = new JoystickView(this);
-            joystick.setId(View.generateViewId());
-            mLayout.addView(joystick, params);
-        }
-
-        if (buttons) {
-            /* Side by side above the joystick, or stacked in the corner without joystick. */
-            int size = (int)(64 * density);
-            int gap = (int)(12 * density);
-
-            RelativeLayout.LayoutParams right_params = new RelativeLayout.LayoutParams(size, size);
-            RelativeLayout.LayoutParams left_params = new RelativeLayout.LayoutParams(size, size);
-            right_button = new ClickButtonView(this, ClickButtonView.Button.RIGHT);
-            right_button.setId(View.generateViewId());
-            left_button = new ClickButtonView(this, ClickButtonView.Button.LEFT);
-
-            if (joystick == null) {
-                right_params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-                right_params.addRule(on_left ? RelativeLayout.ALIGN_PARENT_LEFT : RelativeLayout.ALIGN_PARENT_RIGHT);
-                right_params.setMargins(margin, margin, margin, margin);
-                left_params.addRule(RelativeLayout.ABOVE, right_button.getId());
-                left_params.addRule(RelativeLayout.ALIGN_LEFT, right_button.getId());
-                left_params.setMargins(0, gap, 0, gap);
-            } else {
-                left_params.addRule(RelativeLayout.ABOVE, joystick.getId());
-                left_params.addRule(RelativeLayout.ALIGN_LEFT, joystick.getId());
-                left_params.setMargins(0, 0, 0, gap);
-                right_params.addRule(RelativeLayout.ABOVE, joystick.getId());
-                right_params.addRule(RelativeLayout.ALIGN_RIGHT, joystick.getId());
-                right_params.setMargins(0, 0, 0, gap);
-            }
-            mLayout.addView(right_button, right_params);
-            mLayout.addView(left_button, left_params);
-        }
-    }
+    /** The on-screen joystick and buttons over the game. */
+    private OnScreenControls controls;
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
