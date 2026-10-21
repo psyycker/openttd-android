@@ -152,28 +152,32 @@ public class OpenTTDActivity extends SDLActivity {
         }
 
         if (buttons) {
-            /* Stacked next to the joystick on the side facing the middle of the screen, or in the corner without joystick. */
+            /* Side by side above the joystick, or stacked in the corner without joystick. */
             int size = (int)(64 * density);
             int gap = (int)(12 * density);
 
             RelativeLayout.LayoutParams right_params = new RelativeLayout.LayoutParams(size, size);
-            right_params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-            if (joystick == null) {
-                right_params.addRule(on_left ? RelativeLayout.ALIGN_PARENT_LEFT : RelativeLayout.ALIGN_PARENT_RIGHT);
-                right_params.setMargins(margin, margin, margin, margin);
-            } else {
-                right_params.addRule(on_left ? RelativeLayout.RIGHT_OF : RelativeLayout.LEFT_OF, joystick.getId());
-                right_params.setMargins(gap, gap, gap, margin);
-            }
+            RelativeLayout.LayoutParams left_params = new RelativeLayout.LayoutParams(size, size);
             right_button = new ClickButtonView(this, ClickButtonView.Button.RIGHT);
             right_button.setId(View.generateViewId());
-            mLayout.addView(right_button, right_params);
-
-            RelativeLayout.LayoutParams left_params = new RelativeLayout.LayoutParams(size, size);
-            left_params.addRule(RelativeLayout.ABOVE, right_button.getId());
-            left_params.addRule(RelativeLayout.ALIGN_LEFT, right_button.getId());
-            left_params.setMargins(0, gap, 0, gap);
             left_button = new ClickButtonView(this, ClickButtonView.Button.LEFT);
+
+            if (joystick == null) {
+                right_params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+                right_params.addRule(on_left ? RelativeLayout.ALIGN_PARENT_LEFT : RelativeLayout.ALIGN_PARENT_RIGHT);
+                right_params.setMargins(margin, margin, margin, margin);
+                left_params.addRule(RelativeLayout.ABOVE, right_button.getId());
+                left_params.addRule(RelativeLayout.ALIGN_LEFT, right_button.getId());
+                left_params.setMargins(0, gap, 0, gap);
+            } else {
+                left_params.addRule(RelativeLayout.ABOVE, joystick.getId());
+                left_params.addRule(RelativeLayout.ALIGN_LEFT, joystick.getId());
+                left_params.setMargins(0, 0, 0, gap);
+                right_params.addRule(RelativeLayout.ABOVE, joystick.getId());
+                right_params.addRule(RelativeLayout.ALIGN_RIGHT, joystick.getId());
+                right_params.setMargins(0, 0, 0, gap);
+            }
+            mLayout.addView(right_button, right_params);
             mLayout.addView(left_button, left_params);
         }
     }
