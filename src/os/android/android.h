@@ -13,5 +13,6 @@
 void ShowAndroidAppSettings();
 bool AndroidRestartRequested();
 void AndroidGetJoystick(float &x, float &y);
+bool AndroidPopMouseButtonEvent(int &button, bool &down);
 
 #endif /* ANDROID_H */

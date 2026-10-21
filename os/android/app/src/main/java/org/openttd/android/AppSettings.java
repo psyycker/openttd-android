@@ -15,6 +15,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
@@ -92,28 +93,46 @@ final class AppSettings {
         controls.setPadding(0, pad, 0, pad / 2);
         layout.addView(controls);
 
-        TextView joystick_label = new TextView(activity);
-        joystick_label.setText(R.string.controls_joystick);
-        layout.addView(joystick_label);
+        TextView side_label = new TextView(activity);
+        side_label.setText(R.string.controls_side);
+        layout.addView(side_label);
 
-        RadioGroup joystick = new RadioGroup(activity);
-        joystick.setOrientation(RadioGroup.HORIZONTAL);
-        int[] labels = { R.string.controls_joystick_off, R.string.controls_joystick_left, R.string.controls_joystick_right };
-        Controls.Joystick[] values = Controls.Joystick.values();
+        RadioGroup side = new RadioGroup(activity);
+        side.setOrientation(RadioGroup.HORIZONTAL);
+        int[] labels = { R.string.controls_side_left, R.string.controls_side_right };
+        Controls.Side[] values = Controls.Side.values();
         for (int i = 0; i < values.length; i++) {
             RadioButton option = new RadioButton(activity);
             option.setId(View.generateViewId());
             option.setText(labels[i]);
-            option.setChecked(Controls.getJoystick(activity) == values[i]);
-            Controls.Joystick value = values[i];
+            option.setChecked(Controls.getSide(activity) == values[i]);
+            Controls.Side value = values[i];
             option.setOnCheckedChangeListener((b, checked) -> {
                 if (!checked) return;
-                Controls.setJoystick(activity, value);
+                Controls.setSide(activity, value);
                 host.onControlsChanged();
             });
-            joystick.addView(option);
+            side.addView(option);
         }
+        layout.addView(side);
+
+        CheckBox joystick = new CheckBox(activity);
+        joystick.setText(R.string.controls_joystick);
+        joystick.setChecked(Controls.getJoystick(activity));
+        joystick.setOnCheckedChangeListener((b, checked) -> {
+            Controls.setJoystick(activity, checked);
+            host.onControlsChanged();
+        });
         layout.addView(joystick);
+
+        CheckBox click_buttons = new CheckBox(activity);
+        click_buttons.setText(R.string.controls_click_buttons);
+        click_buttons.setChecked(Controls.getClickButtons(activity));
+        click_buttons.setOnCheckedChangeListener((b, checked) -> {
+            Controls.setClickButtons(activity, checked);
+            host.onControlsChanged();
+        });
+        layout.addView(click_buttons);
 
         TextView section = new TextView(activity);
         section.setText(R.string.storage_title);

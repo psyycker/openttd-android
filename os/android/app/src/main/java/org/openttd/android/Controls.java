@@ -13,10 +13,14 @@ import android.content.SharedPreferences;
 /** Settings for the touch controls of the app. */
 final class Controls {
     private static final String PREFS = "controls";
+    /** Old setting: OFF, LEFT or RIGHT; replaced by KEY_SIDE and KEY_JOYSTICK_SHOWN. */
     private static final String KEY_JOYSTICK = "joystick";
+    private static final String KEY_SIDE = "side";
+    private static final String KEY_JOYSTICK_SHOWN = "joystick_shown";
+    private static final String KEY_CLICK_BUTTONS = "click_buttons";
 
-    /** Where to show the on-screen joystick for scrolling the map. */
-    enum Joystick { OFF, LEFT, RIGHT }
+    /** Which bottom corner the on-screen controls are in, e.g. for left or right handed play. */
+    enum Side { LEFT, RIGHT }
 
     private Controls() {}
 
@@ -24,15 +28,36 @@ final class Controls {
         return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
     }
 
-    static Joystick getJoystick(Context context) {
+    static Side getSide(Context context) {
+        String old = prefs(context).getString(KEY_JOYSTICK, null);
+        String fallback = "RIGHT".equals(old) ? Side.RIGHT.name() : Side.LEFT.name();
         try {
-            return Joystick.valueOf(prefs(context).getString(KEY_JOYSTICK, Joystick.OFF.name()));
+            return Side.valueOf(prefs(context).getString(KEY_SIDE, fallback));
         } catch (IllegalArgumentException e) {
-            return Joystick.OFF;
+            return Side.LEFT;
         }
     }
 
-    static void setJoystick(Context context, Joystick joystick) {
-        prefs(context).edit().putString(KEY_JOYSTICK, joystick.name()).apply();
+    static void setSide(Context context, Side side) {
+        prefs(context).edit().putString(KEY_SIDE, side.name()).apply();
+    }
+
+    /** Whether to show the on-screen joystick to scroll the map. */
+    static boolean getJoystick(Context context) {
+        String old = prefs(context).getString(KEY_JOYSTICK, null);
+        return prefs(context).getBoolean(KEY_JOYSTICK_SHOWN, old != null && !"OFF".equals(old));
+    }
+
+    static void setJoystick(Context context, boolean show) {
+        prefs(context).edit().putBoolean(KEY_JOYSTICK_SHOWN, show).apply();
+    }
+
+    /** Whether to show on-screen left and right mouse buttons. */
+    static boolean getClickButtons(Context context) {
+        return prefs(context).getBoolean(KEY_CLICK_BUTTONS, false);
+    }
+
+    static void setClickButtons(Context context, boolean show) {
+        prefs(context).edit().putBoolean(KEY_CLICK_BUTTONS, show).apply();
     }
 }

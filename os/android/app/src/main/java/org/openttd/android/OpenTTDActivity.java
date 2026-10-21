@@ -10,6 +10,7 @@ package org.openttd.android;
 import android.app.Dialog;
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.RelativeLayout;
@@ -120,28 +121,61 @@ public class OpenTTDActivity extends SDLActivity {
 
     /** The on-screen joystick for scrolling the map, while shown. */
     private JoystickView joystick;
+    /** The on-screen left and right mouse buttons, while shown. */
+    private ClickButtonView left_button, right_button;
 
-    /** Show, move or hide the on-screen joystick, following the settings. */
+    /** Show, move or hide the on-screen joystick and mouse buttons, following the settings. */
     private void updateJoystick() {
         if (mLayout == null) return;
-        if (joystick != null) {
-            mLayout.removeView(joystick);
-            joystick = null;
+        for (View v : new View[] { joystick, left_button, right_button }) {
+            if (v != null) mLayout.removeView(v);
+        }
+        joystick = null;
+        left_button = right_button = null;
+
+        boolean show_joystick = Controls.getJoystick(this);
+        boolean buttons = Controls.getClickButtons(this);
+        boolean on_left = Controls.getSide(this) == Controls.Side.LEFT;
+        float density = getResources().getDisplayMetrics().density;
+        int margin = (int)(24 * density);
+
+        if (show_joystick) {
+            int size = (int)(140 * density);
+            RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(size, size);
+            params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+            params.addRule(on_left ? RelativeLayout.ALIGN_PARENT_LEFT : RelativeLayout.ALIGN_PARENT_RIGHT);
+            params.setMargins(margin, margin, margin, margin);
+
+            joystick = new JoystickView(this);
+            joystick.setId(View.generateViewId());
+            mLayout.addView(joystick, params);
         }
 
-        Controls.Joystick setting = Controls.getJoystick(this);
-        if (setting == Controls.Joystick.OFF) return;
+        if (buttons) {
+            /* Stacked next to the joystick on the side facing the middle of the screen, or in the corner without joystick. */
+            int size = (int)(64 * density);
+            int gap = (int)(12 * density);
 
-        float density = getResources().getDisplayMetrics().density;
-        int size = (int)(140 * density);
-        int margin = (int)(24 * density);
-        RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(size, size);
-        params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
-        params.addRule(setting == Controls.Joystick.LEFT ? RelativeLayout.ALIGN_PARENT_LEFT : RelativeLayout.ALIGN_PARENT_RIGHT);
-        params.setMargins(margin, margin, margin, margin);
+            RelativeLayout.LayoutParams right_params = new RelativeLayout.LayoutParams(size, size);
+            right_params.addRule(RelativeLayout.ALIGN_PARENT_BOTTOM);
+            if (joystick == null) {
+                right_params.addRule(on_left ? RelativeLayout.ALIGN_PARENT_LEFT : RelativeLayout.ALIGN_PARENT_RIGHT);
+                right_params.setMargins(margin, margin, margin, margin);
+            } else {
+                right_params.addRule(on_left ? RelativeLayout.RIGHT_OF : RelativeLayout.LEFT_OF, joystick.getId());
+                right_params.setMargins(gap, gap, gap, margin);
+            }
+            right_button = new ClickButtonView(this, ClickButtonView.Button.RIGHT);
+            right_button.setId(View.generateViewId());
+            mLayout.addView(right_button, right_params);
 
-        joystick = new JoystickView(this);
-        mLayout.addView(joystick, params);
+            RelativeLayout.LayoutParams left_params = new RelativeLayout.LayoutParams(size, size);
+            left_params.addRule(RelativeLayout.ABOVE, right_button.getId());
+            left_params.addRule(RelativeLayout.ALIGN_LEFT, right_button.getId());
+            left_params.setMargins(0, gap, 0, gap);
+            left_button = new ClickButtonView(this, ClickButtonView.Button.LEFT);
+            mLayout.addView(left_button, left_params);
+        }
     }
 
     @Override
