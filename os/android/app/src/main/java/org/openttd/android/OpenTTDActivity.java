@@ -102,7 +102,7 @@ public class OpenTTDActivity extends SDLActivity {
         });
 
         settings_dialog = new Dialog(this, R.style.AppSettingsDialog);
-        settings_dialog.setContentView(settings.createView());
+        settings_dialog.setContentView(settings.createView(settings_dialog.getContext()));
         settings_dialog.setOnDismissListener(d -> {
             settings_dialog = null;
             settings = null;
