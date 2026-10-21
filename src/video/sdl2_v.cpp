@@ -745,6 +745,21 @@ void VideoDriver_SDL_Base::InputLoop()
 
 	this->ScrollWithJoystick();
 
+	/* On-screen left/right mouse buttons (see ClickButtonView.java), acting at the cursor. */
+	int button;
+	bool down;
+	while (AndroidPopMouseButtonEvent(button, down)) {
+		_cursor.in_window = true;
+		if (button == 0) {
+			_left_button_down = down;
+			if (!down) _left_button_clicked = false;
+		} else {
+			_right_button_down = down;
+			if (down) _right_button_clicked = true;
+		}
+		HandleMouseEvents();
+	}
+
 	/* The app settings changed something that needs a restart; save and quit, android_main.cpp restarts the app. */
 	if (AndroidRestartRequested()) {
 		SaveBackgroundGame();

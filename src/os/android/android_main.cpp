@@ -18,6 +18,8 @@
 #include <SDL_main.h>
 #include <android/log.h>
 #include <atomic>
+#include <deque>
+#include <mutex>
 #include <jni.h>
 #include <pthread.h>
 #include <signal.h>
@@ -129,6 +131,37 @@ void AndroidGetJoystick(float &x, float &y)
 {
 	x = _joystick_x;
 	y = _joystick_y;
+}
+
+/** A press or release of one of the on-screen mouse buttons. */
+struct MouseButtonEvent {
+	int button; ///< 0 for the left button, 1 for the right button.
+	bool down;  ///< Whether the button was pressed or released.
+};
+static std::mutex _mouse_button_mutex;
+static std::deque<MouseButtonEvent> _mouse_button_events;
+
+/** Called by ClickButtonView.nativeMouseButton, on the Java UI thread. */
+extern "C" JNIEXPORT void JNICALL Java_org_openttd_android_ClickButtonView_nativeMouseButton(JNIEnv *, jclass, jint button, jboolean down)
+{
+	std::lock_guard<std::mutex> lock(_mouse_button_mutex);
+	_mouse_button_events.push_back({button, down == JNI_TRUE});
+}
+
+/**
+ * Get the next press or release of the on-screen mouse buttons, in the order they happened.
+ * @param[out] button 0 for the left button, 1 for the right button.
+ * @param[out] down Whether the button was pressed or released.
+ * @return Whether there was an event.
+ */
+bool AndroidPopMouseButtonEvent(int &button, bool &down)
+{
+	std::lock_guard<std::mutex> lock(_mouse_button_mutex);
+	if (_mouse_button_events.empty()) return false;
+	button = _mouse_button_events.front().button;
+	down = _mouse_button_events.front().down;
+	_mouse_button_events.pop_front();
+	return true;
 }
 
 /** Ask the Java side to start the app again, once this process has ended. */
