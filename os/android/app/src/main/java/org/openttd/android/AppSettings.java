@@ -9,6 +9,7 @@ package org.openttd.android;
 
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Insets;
 import android.view.Gravity;
@@ -49,6 +50,8 @@ final class AppSettings {
 
     private final Activity activity;
     private final Host host;
+    /** Context to create the views with, so they follow the theme of the screen they are shown on. */
+    private Context ui;
     private TextView current;
     private TextView status;
     private Button grant;
@@ -58,27 +61,37 @@ final class AppSettings {
     AppSettings(Activity activity, Host host) {
         this.activity = activity;
         this.host = host;
+        this.ui = activity;
     }
 
     private String str(int id, Object... args) {
         return activity.getString(id, args);
     }
 
-    /** Create the view with all settings. */
+    /** Create the view with all settings, themed like the activity. */
     View createView() {
+        return createView(activity);
+    }
+
+    /**
+     * Create the view with all settings.
+     * @param ui Context with the theme of the window the view is shown in.
+     */
+    View createView(Context ui) {
+        this.ui = ui;
         int pad = (int)(24 * activity.getResources().getDisplayMetrics().density);
 
-        LinearLayout layout = new LinearLayout(activity);
+        LinearLayout layout = new LinearLayout(ui);
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(pad, pad / 2, pad, pad);
 
         /* Header with title and close button. */
-        FrameLayout header = new FrameLayout(activity);
-        TextView title = new TextView(activity);
+        FrameLayout header = new FrameLayout(ui);
+        TextView title = new TextView(ui);
         title.setText(R.string.app_settings_title);
         title.setTextAppearance(android.R.style.TextAppearance_DeviceDefault_Large);
         header.addView(title, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT, Gravity.START | Gravity.CENTER_VERTICAL));
-        ImageButton close = new ImageButton(activity);
+        ImageButton close = new ImageButton(ui);
         close.setImageResource(android.R.drawable.ic_menu_close_clear_cancel);
         close.setBackground(null);
         close.setContentDescription(str(R.string.app_settings_close));
@@ -87,22 +100,22 @@ final class AppSettings {
         layout.addView(header);
 
         /* Controls. */
-        TextView controls = new TextView(activity);
+        TextView controls = new TextView(ui);
         controls.setText(R.string.controls_title);
         controls.setTextAppearance(android.R.style.TextAppearance_DeviceDefault_Medium);
         controls.setPadding(0, pad, 0, pad / 2);
         layout.addView(controls);
 
-        TextView side_label = new TextView(activity);
+        TextView side_label = new TextView(ui);
         side_label.setText(R.string.controls_side);
         layout.addView(side_label);
 
-        RadioGroup side = new RadioGroup(activity);
+        RadioGroup side = new RadioGroup(ui);
         side.setOrientation(RadioGroup.HORIZONTAL);
         int[] labels = { R.string.controls_side_left, R.string.controls_side_right };
         Controls.Side[] values = Controls.Side.values();
         for (int i = 0; i < values.length; i++) {
-            RadioButton option = new RadioButton(activity);
+            RadioButton option = new RadioButton(ui);
             option.setId(View.generateViewId());
             option.setText(labels[i]);
             option.setChecked(Controls.getSide(activity) == values[i]);
@@ -116,7 +129,7 @@ final class AppSettings {
         }
         layout.addView(side);
 
-        CheckBox joystick = new CheckBox(activity);
+        CheckBox joystick = new CheckBox(ui);
         joystick.setText(R.string.controls_joystick);
         joystick.setChecked(Controls.getJoystick(activity));
         joystick.setOnCheckedChangeListener((b, checked) -> {
@@ -125,7 +138,7 @@ final class AppSettings {
         });
         layout.addView(joystick);
 
-        CheckBox click_buttons = new CheckBox(activity);
+        CheckBox click_buttons = new CheckBox(ui);
         click_buttons.setText(R.string.controls_click_buttons);
         click_buttons.setChecked(Controls.getClickButtons(activity));
         click_buttons.setOnCheckedChangeListener((b, checked) -> {
@@ -134,46 +147,46 @@ final class AppSettings {
         });
         layout.addView(click_buttons);
 
-        TextView section = new TextView(activity);
+        TextView section = new TextView(ui);
         section.setText(R.string.storage_title);
         section.setTextAppearance(android.R.style.TextAppearance_DeviceDefault_Medium);
         section.setPadding(0, pad, 0, pad / 2);
         layout.addView(section);
 
-        TextView intro = new TextView(activity);
+        TextView intro = new TextView(ui);
         intro.setText(R.string.storage_intro);
         layout.addView(intro);
 
-        current = new TextView(activity);
+        current = new TextView(ui);
         current.setPadding(0, pad, 0, pad);
         current.setTextIsSelectable(true);
         layout.addView(current);
 
-        Button use_public = new Button(activity);
+        Button use_public = new Button(ui);
         use_public.setText(str(R.string.storage_use_public, StorageLocation.getPublicDir().getAbsolutePath()));
         use_public.setOnClickListener(v -> onFolderChosen(StorageLocation.getPublicDir()));
         layout.addView(use_public);
 
-        Button choose = new Button(activity);
+        Button choose = new Button(ui);
         choose.setText(R.string.storage_choose);
         choose.setOnClickListener(v -> activity.startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE), REQUEST_PICK_FOLDER));
         layout.addView(choose);
 
-        Button reset = new Button(activity);
+        Button reset = new Button(ui);
         reset.setText(R.string.storage_reset);
         reset.setOnClickListener(v -> changeTo(null));
         layout.addView(reset);
 
-        status = new TextView(activity);
+        status = new TextView(ui);
         status.setPadding(0, pad, 0, 0);
         layout.addView(status);
 
-        grant = new Button(activity);
+        grant = new Button(ui);
         grant.setText(R.string.storage_grant);
         grant.setOnClickListener(v -> StorageLocation.requestAllFilesAccess(activity));
         layout.addView(grant);
 
-        ScrollView scroll = new ScrollView(activity);
+        ScrollView scroll = new ScrollView(ui);
         scroll.addView(layout);
         /* Keep the content clear of the system bars and display cutouts. */
         scroll.setOnApplyWindowInsetsListener((v, insets) -> {
@@ -204,7 +217,7 @@ final class AppSettings {
 
         File dir = StorageLocation.treeUriToDir(data.getData());
         if (dir == null) {
-            new AlertDialog.Builder(activity).setMessage(R.string.storage_unsupported).setPositiveButton(android.R.string.ok, null).show();
+            new AlertDialog.Builder(ui).setMessage(R.string.storage_unsupported).setPositiveButton(android.R.string.ok, null).show();
         } else {
             onFolderChosen(dir);
         }
@@ -230,7 +243,7 @@ final class AppSettings {
 
         /* Continue in onResume, once the permission has been granted. */
         pending = dir;
-        new AlertDialog.Builder(activity)
+        new AlertDialog.Builder(ui)
                 .setMessage(R.string.storage_permission_explain)
                 .setPositiveButton(R.string.storage_grant, (d, w) -> StorageLocation.requestAllFilesAccess(activity))
                 .setNegativeButton(android.R.string.cancel, (d, w) -> pending = null)
@@ -250,7 +263,7 @@ final class AppSettings {
             return;
         }
 
-        new AlertDialog.Builder(activity)
+        new AlertDialog.Builder(ui)
                 .setTitle(R.string.storage_title)
                 .setMessage(str(R.string.storage_copy_question, from.getAbsolutePath(), to.getAbsolutePath()))
                 .setPositiveButton(R.string.storage_copy, (d, w) -> apply(dir, from))
@@ -269,14 +282,14 @@ final class AppSettings {
         updateViews();
 
         if (host.isGameRunning()) {
-            new AlertDialog.Builder(activity)
+            new AlertDialog.Builder(ui)
                     .setTitle(R.string.storage_title)
                     .setMessage(R.string.storage_restart)
                     .setPositiveButton(R.string.storage_restart_now, (d, w) -> host.restartGame())
                     .setNegativeButton(R.string.storage_restart_later, null)
                     .show();
         } else if (copy_from != null) {
-            new AlertDialog.Builder(activity).setMessage(R.string.storage_copy_on_start).setPositiveButton(android.R.string.ok, null).show();
+            new AlertDialog.Builder(ui).setMessage(R.string.storage_copy_on_start).setPositiveButton(android.R.string.ok, null).show();
         }
     }
 }
