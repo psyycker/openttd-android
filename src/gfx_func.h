@@ -78,6 +78,7 @@ void HandleMouseEvents();
 bool HandleTouchPan(Point delta);
 void HandleBackButton();
 void HandleTouchZoom(bool in);
+void HandleJoystickScroll(Point delta);
 void UpdateWindows();
 void ChangeGameSpeed(bool enable_fast_forward);
 

@@ -109,6 +109,28 @@ bool AndroidRestartRequested()
 	return true;
 }
 
+/** Position of the on-screen joystick (see JoystickView.java); -1..1 in both directions, 0 when released. */
+static std::atomic<float> _joystick_x = 0.0f;
+static std::atomic<float> _joystick_y = 0.0f;
+
+/** Called by JoystickView.nativeSetJoystick, on the Java UI thread. */
+extern "C" JNIEXPORT void JNICALL Java_org_openttd_android_JoystickView_nativeSetJoystick(JNIEnv *, jclass, jfloat x, jfloat y)
+{
+	_joystick_x = x;
+	_joystick_y = y;
+}
+
+/**
+ * Get the position of the on-screen joystick.
+ * @param[out] x Horizontal position, -1 (left) .. 1 (right).
+ * @param[out] y Vertical position, -1 (up) .. 1 (down).
+ */
+void AndroidGetJoystick(float &x, float &y)
+{
+	x = _joystick_x;
+	y = _joystick_y;
+}
+
 /** Ask the Java side to start the app again, once this process has ended. */
 static void RestartApp()
 {

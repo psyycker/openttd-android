@@ -698,6 +698,8 @@ void VideoDriver_SDL_Base::InputLoop()
 #ifdef __ANDROID__
 	this->SyncPointerCapture();
 
+	this->ScrollWithJoystick();
+
 	/* The app settings changed something that needs a restart; save and quit, android_main.cpp restarts the app. */
 	if (AndroidRestartRequested()) {
 		SaveBackgroundGame();
@@ -707,6 +709,34 @@ void VideoDriver_SDL_Base::InputLoop()
 }
 
 #ifdef __ANDROID__
+/** Scroll the map with the on-screen joystick; the further it is pushed, the faster. */
+void VideoDriver_SDL_Base::ScrollWithJoystick()
+{
+	/* At full deflection, scroll a screen width per second. */
+	const float max_speed = static_cast<float>(_screen.width);
+
+	auto now = std::chrono::steady_clock::now();
+	float dt = std::min(std::chrono::duration<float>(now - this->last_joystick_scroll).count(), 0.1f);
+	this->last_joystick_scroll = now;
+
+	float x, y;
+	AndroidGetJoystick(x, y);
+	if (x == 0 && y == 0) {
+		this->joystick_rest_x = this->joystick_rest_y = 0;
+		return;
+	}
+
+	/* Quadratic response: precise near the centre, fast at the edge. */
+	float strength = std::min(std::hypot(x, y), 1.0f);
+	float dx = x * strength * max_speed * dt + this->joystick_rest_x;
+	float dy = y * strength * max_speed * dt + this->joystick_rest_y;
+	Point delta = { static_cast<int>(dx), static_cast<int>(dy) };
+	this->joystick_rest_x = dx - delta.x;
+	this->joystick_rest_y = dy - delta.y;
+
+	if (delta.x != 0 || delta.y != 0) HandleJoystickScroll(delta);
+}
+
 /** Capture the mouse pointer while the cursor is fixed (scrolling), as Android cannot warp the pointer back. */
 void VideoDriver_SDL_Base::SyncPointerCapture()
 {

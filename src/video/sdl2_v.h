@@ -77,6 +77,11 @@ private:
 	std::optional<std::string_view> Initialize();
 #ifdef __ANDROID__
 	void SyncPointerCapture();
+	void ScrollWithJoystick();
+
+	std::chrono::steady_clock::time_point last_joystick_scroll{}; ///< When the map was last scrolled with the on-screen joystick.
+	float joystick_rest_x = 0; ///< Sub-pixel remainder of scrolling with the joystick.
+	float joystick_rest_y = 0; ///< Sub-pixel remainder of scrolling with the joystick.
 #endif
 
 #ifdef __EMSCRIPTEN__

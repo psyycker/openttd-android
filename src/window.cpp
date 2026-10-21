@@ -2541,6 +2541,27 @@ bool HandleTouchPan(Point delta)
 }
 
 /**
+ * Scroll the main view with the on-screen joystick of touch screens.
+ * @param delta Distance to scroll, in pixels.
+ */
+void HandleJoystickScroll(Point delta)
+{
+	if (_game_mode == GM_MENU || HasModalProgress()) return;
+
+	Window *w = FindWindowById(WC_MAIN_WINDOW, 0);
+	if (w == nullptr || w->viewport == nullptr) return;
+
+	if (w->viewport->follow_vehicle != VehicleID::Invalid()) {
+		/* If the main window is following a vehicle, then first let go of it! */
+		const Vehicle *veh = Vehicle::Get(w->viewport->follow_vehicle);
+		ScrollMainWindowTo(veh->x_pos, veh->y_pos, veh->z_pos, true); // This also resets follow_vehicle
+		return;
+	}
+
+	w->OnScroll(delta);
+}
+
+/**
  * Zoom the viewport under the mouse cursor, by pinching on a touch screen.
  * @param in Whether to zoom in.
  */
