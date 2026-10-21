@@ -37,6 +37,8 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+                <!-- Lists the app with the games, e.g. for launchers looking for game apps. -->
+                <category android:name="android.intent.category.APP_GAME" />
             </intent-filter>
         </activity>
 

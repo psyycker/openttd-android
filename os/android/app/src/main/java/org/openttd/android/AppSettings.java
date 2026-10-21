@@ -16,12 +16,9 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.WindowInsets;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
@@ -44,8 +41,10 @@ final class AppSettings {
         void restartGame();
         /** Close the settings. */
         void close();
-        /** The touch controls settings changed. */
-        default void onControlsChanged() {}
+        /** Whether the on-screen controls can be edited, i.e. they are shown over the game. */
+        default boolean canEditControls() { return false; }
+        /** Close the settings and show the editor of the on-screen controls. */
+        default void editControls() {}
     }
 
     private final Activity activity;
@@ -106,46 +105,16 @@ final class AppSettings {
         controls.setPadding(0, pad, 0, pad / 2);
         layout.addView(controls);
 
-        TextView side_label = new TextView(ui);
-        side_label.setText(R.string.controls_side);
-        layout.addView(side_label);
+        TextView controls_intro = new TextView(ui);
+        controls_intro.setText(host.canEditControls() ? R.string.controls_intro : R.string.controls_in_game);
+        layout.addView(controls_intro);
 
-        RadioGroup side = new RadioGroup(ui);
-        side.setOrientation(RadioGroup.HORIZONTAL);
-        int[] labels = { R.string.controls_side_left, R.string.controls_side_right };
-        Controls.Side[] values = Controls.Side.values();
-        for (int i = 0; i < values.length; i++) {
-            RadioButton option = new RadioButton(ui);
-            option.setId(View.generateViewId());
-            option.setText(labels[i]);
-            option.setChecked(Controls.getSide(activity) == values[i]);
-            Controls.Side value = values[i];
-            option.setOnCheckedChangeListener((b, checked) -> {
-                if (!checked) return;
-                Controls.setSide(activity, value);
-                host.onControlsChanged();
-            });
-            side.addView(option);
+        if (host.canEditControls()) {
+            Button edit = new Button(ui);
+            edit.setText(R.string.controls_edit);
+            edit.setOnClickListener(v -> host.editControls());
+            layout.addView(edit);
         }
-        layout.addView(side);
-
-        CheckBox joystick = new CheckBox(ui);
-        joystick.setText(R.string.controls_joystick);
-        joystick.setChecked(Controls.getJoystick(activity));
-        joystick.setOnCheckedChangeListener((b, checked) -> {
-            Controls.setJoystick(activity, checked);
-            host.onControlsChanged();
-        });
-        layout.addView(joystick);
-
-        CheckBox click_buttons = new CheckBox(ui);
-        click_buttons.setText(R.string.controls_click_buttons);
-        click_buttons.setChecked(Controls.getClickButtons(activity));
-        click_buttons.setOnCheckedChangeListener((b, checked) -> {
-            Controls.setClickButtons(activity, checked);
-            host.onControlsChanged();
-        });
-        layout.addView(click_buttons);
 
         TextView section = new TextView(ui);
         section.setText(R.string.storage_title);
