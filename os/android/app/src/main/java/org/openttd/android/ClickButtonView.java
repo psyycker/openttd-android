@@ -11,19 +11,25 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.view.HapticFeedbackConstants;
+import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 
+import org.libsdl.app.SDLActivity;
+
 /**
- * On-screen left or right mouse button, shown next to the joystick. It acts at
- * the cursor like a real mouse button: held down while touched, so another
- * finger can move the cursor to drag.
+ * On-screen button: a left or right mouse button, or a key. It acts like the
+ * real thing: held down while touched, so another finger can move the cursor
+ * to drag, or click while a modifier key is held.
  */
 public class ClickButtonView extends View {
-    /** Which mouse button. */
-    enum Button { LEFT, RIGHT }
+    /** What the button does when pressed or released. */
+    interface Action {
+        void set(boolean down);
+    }
 
-    private final Button button;
+    private final String label;
+    private final Action action;
     private final Paint fill = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint ring = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint text = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -32,9 +38,29 @@ public class ClickButtonView extends View {
     /** Pass a press or release to the game; see android_main.cpp. */
     private static native void nativeMouseButton(int button, boolean down);
 
-    public ClickButtonView(Context context, Button button) {
+    /** Press or release a mouse button: 0 for left, 1 for right. */
+    static Action mouse(int button) {
+        return down -> nativeMouseButton(button, down);
+    }
+
+    /** Press or release a key, with the given modifiers held around it. */
+    static Action key(int key, boolean ctrl, boolean shift, boolean alt) {
+        return down -> {
+            int[] modifiers = { ctrl ? KeyEvent.KEYCODE_CTRL_LEFT : 0, shift ? KeyEvent.KEYCODE_SHIFT_LEFT : 0, alt ? KeyEvent.KEYCODE_ALT_LEFT : 0 };
+            if (down) {
+                for (int m : modifiers) if (m != 0) SDLActivity.onNativeKeyDown(m);
+                SDLActivity.onNativeKeyDown(key);
+            } else {
+                SDLActivity.onNativeKeyUp(key);
+                for (int m : modifiers) if (m != 0) SDLActivity.onNativeKeyUp(m);
+            }
+        };
+    }
+
+    public ClickButtonView(Context context, String label, String description, Action action) {
         super(context);
-        this.button = button;
+        this.label = label;
+        this.action = action;
         float density = getResources().getDisplayMetrics().density;
         ring.setColor(0x80FFFFFF);
         ring.setStyle(Paint.Style.STROKE);
@@ -42,7 +68,7 @@ public class ClickButtonView extends View {
         text.setColor(0xD0FFFFFF);
         text.setTextAlign(Paint.Align.CENTER);
         text.setFakeBoldText(true);
-        setContentDescription(button == Button.LEFT ? "Left click" : "Right click");
+        setContentDescription(description);
     }
 
     @Override
@@ -53,14 +79,17 @@ public class ClickButtonView extends View {
         fill.setColor(pressed ? 0x90FFFFFF : 0x40000000);
         canvas.drawCircle(cx, cy, r, fill);
         canvas.drawCircle(cx, cy, r, ring);
+        /* Shrink longer labels to fit inside the circle. */
         text.setTextSize(r * 0.8f);
-        canvas.drawText(button == Button.LEFT ? "L" : "R", cx, cy - (text.descent() + text.ascent()) / 2, text);
+        float width = text.measureText(label);
+        if (width > r * 1.5f) text.setTextSize(r * 0.8f * r * 1.5f / width);
+        canvas.drawText(label, cx, cy - (text.descent() + text.ascent()) / 2, text);
     }
 
     private void setPressed(boolean down, boolean notify) {
         if (pressed == down) return;
         pressed = down;
-        if (notify) nativeMouseButton(button == Button.LEFT ? 0 : 1, down);
+        if (notify) action.set(down);
         if (down) performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY);
         invalidate();
     }
