@@ -38,10 +38,11 @@ The storage location has not been changed.</string>
     <string name="storage_copy_failed_start">Copying your files to the new folder failed: %1$s</string>
     <string name="app_settings_close">Back to the game</string>
     <string name="controls_title">Controls</string>
-    <string name="controls_joystick">On-screen joystick to move the map:</string>
-    <string name="controls_joystick_off">Off</string>
-    <string name="controls_joystick_left">Bottom left</string>
-    <string name="controls_joystick_right">Bottom right</string>
+    <string name="controls_side">On-screen controls:</string>
+    <string name="controls_side_left">Bottom left</string>
+    <string name="controls_side_right">Bottom right</string>
+    <string name="controls_joystick">Joystick to move the map</string>
+    <string name="controls_click_buttons">Left/right click buttons</string>
     <string name="storage_restart_now">Restart now</string>
     <string name="storage_restart_later">Later</string>
 </resources>
