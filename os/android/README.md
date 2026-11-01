@@ -73,7 +73,7 @@ There are two branches:
   can join its multiplayer servers.
 - `main`: the Android port on top of OpenTTD's master (the development
   version). It is built every night as the "nightly" pre-release, which
-  installs as a separate "OpenTTD Nightly" app (set `openttd.nightly=true`
+  installs as a separate "OpenTTD Touch Nightly" app (set `openttd.nightly=true`
   for such a build locally).
 
 `.github/workflows/deploy.yml` builds the APKs on GitHub Actions. Pushing a tag
