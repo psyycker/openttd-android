@@ -57,7 +57,7 @@ android {
         versionCode = commitCount
         versionName = setting("openttd.versionName", "OPENTTD_VERSION_NAME") ?: "$openttdVersion-android"
         if (nightly) applicationIdSuffix = ".nightly"
-        resValue("string", "app_name", if (nightly) "OpenTTD Nightly" else "OpenTTD")
+        resValue("string", "app_name", if (nightly) "OpenTTD Touch Nightly" else "OpenTTD Touch")
 
         ndk {
             abiFilters += abis

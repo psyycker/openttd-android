@@ -5,7 +5,7 @@ name: Deploy
 #   release) publishes a release; the game identifies as that OpenTTD release,
 #   so it can join its multiplayer servers.
 # - Every night, "main" (based on OpenTTD's master) is published as the
-#   "nightly" pre-release, as a separate "OpenTTD Nightly" app.
+#   "nightly" pre-release, as a separate "OpenTTD Touch Nightly" app.
 # - Running it manually on another branch only produces a downloadable APK.
 
 on:
@@ -186,4 +186,4 @@ jobs:
         gh release delete nightly --yes 2>/dev/null || true
         gh release create nightly dist/*.apk --prerelease --latest=false \
           --title "Nightly build" \
-          --notes "Automatic build of the main branch (based on OpenTTD's development version), ${VERSION}. Installs as a separate \"OpenTTD Nightly\" app; it can only play multiplayer with identical builds."
+          --notes "Automatic build of the main branch (based on OpenTTD's development version), ${VERSION}. Installs as a separate \"OpenTTD Touch Nightly\" app; it can only play multiplayer with identical builds."
